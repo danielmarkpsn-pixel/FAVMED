@@ -1,213 +1,89 @@
-# MCP Quarks Agendamentos
+# Clínica Favmed - Medicina Ocupacional
 
-Model Context Protocol (MCP) Server para integração com a API Quarks Clinic.
+Servidor de integração MCP com a API Quarks para apoiar as rotinas de agendamento da clínica.
 
-## Versão 2.0.0
+![Ícone da Clínica Favmed](assets/clinica-favmed.svg)
 
-Esta versão inclui todas as ferramentas de agendamento disponíveis na API Quarks, com correções importantes de headers e formatos de data.
+**Versão:** 2.1.0  
+**Idioma:** Português do Brasil  
+**Instalação prevista:** uma clínica / uma unidade operacional
 
-## Alterações da v1.0.0 para v2.0.0
+> Este repositório contém o serviço de integração (backend), não uma interface gráfica completa de recepção. As ferramentas disponíveis dependem dos recursos habilitados na API Quarks e das credenciais fornecidas pela clínica.
 
-### Correções Implementadas
+## Melhorias da versão 2.1
 
-1. **Headers Corrigidos**:
-   - Mudou de `Authorization: Bearer` para `Auth-token`
-   - Adicionado suporte para `X-Chave-Key` e `X-Secret-Key`
+- Nome e identificação atualizados para **Clínica Favmed - Medicina Ocupacional**.
+- Ícone vetorial próprio para a marca.
+- Autenticação obrigatória por token Bearer em todas as rotas MCP.
+- CORS desativado por padrão; origens confiáveis podem ser configuradas.
+- Limite de 1 MB para o corpo das requisições.
+- Remoção de logs de parâmetros, corpos de requisição e respostas que poderiam conter dados pessoais ou de saúde.
+- Respostas de erro sem detalhes internos ou conteúdo da API.
+- Timeout configurável para chamadas à API Quarks.
+- Correção do tratamento de respostas JSON inválidas, sem referência a variável fora do escopo.
+- Verificação de saúde simplificada, sem revelar configuração interna.
+- Script `npm run mcp` corrigido para iniciar o servidor existente.
 
-2. **Base URL Atualizada**:
-   - De `/clinic/ext` para `/clinic/ext/v1`
+## Requisitos
 
-3. **Formato de Data Corrigido**:
-   - De `dd/MM/yyyy` para `dd-MM-yyyy` (com hífen)
+- Node.js 20 ou superior
+- Credenciais válidas da API Quarks
+- Um token privado para autenticar o cliente MCP
 
-4. **Paginação Corrigida**:
-   - Início padrão mudou de `0` para `1`
+## Configuração local
 
-### Novas Ferramentas Adicionadas
+1. No GitHub, baixe o código como ZIP ou clone o repositório.
+2. Crie um arquivo local chamado `.env` usando `.env.example` como modelo.
+3. Preencha no arquivo `.env`:
+   - `MCP_AUTH_TOKEN`: token privado longo e aleatório para proteger o acesso ao MCP.
+   - `QUARKS_API_TOKEN`: token fornecido pela Quarks.
+   - `QUARKS_CHAVE_KEY` e `QUARKS_SECRET_KEY`: chaves fornecidas pela Quarks, quando exigidas.
+4. Instale as dependências com `npm install`.
+5. Inicie com `npm start`.
 
-#### Gestão de Agendas (5 novas ferramentas)
-- `listar_agendas` - Lista todas as agendas cadastradas
-- `buscar_agenda` - Busca uma agenda específica por ID
-- `buscar_horarios_livres` - Verifica horários disponíveis em uma agenda
-- `buscar_horarios_bloqueados` - Lista horários bloqueados de uma agenda
-- `buscar_horarios_permitidos` - Lista horários permitidos de uma agenda
+Não publique o arquivo `.env`, nem coloque credenciais reais em commits, capturas de tela ou mensagens. Se alguma credencial verdadeira já foi publicada no histórico do GitHub, substitua-a junto ao fornecedor; apagar o arquivo atual não remove cópias antigas do histórico.
 
-#### Gestão de Agendamentos (3 novas ferramentas)
-- `mudar_status_agendamento` - Muda o status de um agendamento para qualquer valor válido
-- `buscar_historico_status` - Retorna histórico completo de mudanças de status
+## Variáveis de ambiente
 
-#### Gestão de Profissionais (1 nova ferramenta)
-- `buscar_profissional` - Busca detalhes completos de um profissional
+| Variável | Obrigatória | Finalidade |
+|---|---|---|
+| `MCP_AUTH_TOKEN` | Sim para usar MCP | Autentica o cliente com Bearer token |
+| `QUARKS_API_TOKEN` | Sim para chamadas à Quarks | Token de acesso à API |
+| `QUARKS_CHAVE_KEY` | Conforme operação | Chave adicional da API |
+| `QUARKS_SECRET_KEY` | Conforme operação | Chave secreta adicional da API |
+| `QUARKS_API_URL` | Não | URL base da API Quarks |
+| `QUARKS_API_TIMEOUT_MS` | Não | Tempo limite, de 1.000 a 60.000 ms |
+| `CORS_ORIGINS` | Não | Origens web autorizadas, separadas por vírgula |
 
-### Ferramentas Atualizadas
+A rota `/mcp` responde com erro 503 quando `MCP_AUTH_TOKEN` não está configurado. A rota `/health` é pública e retorna apenas o estado básico do serviço.
 
-- `listar_agendamentos` - Adicionados novos filtros (data_criacao, status como array)
-- `criar_agendamento` - Atualizado com todos os campos obrigatórios da API
-- `cancelar_agendamento` - Agora usa PATCH com query string para o motivo
-- `confirmar_agendamento` - Agora usa PATCH conforme documentação
+## Rotas
 
-## Configuração
+- `GET /` — identificação do serviço.
+- `GET /health` — disponibilidade básica.
+- `GET /favicon.svg` — ícone do serviço.
+- `POST /mcp` — endpoint MCP autenticado.
+- `GET /mcp/tools` — lista de ferramentas, autenticada.
+- `GET /mcp/tools/:toolName` — esquema de uma ferramenta, autenticado.
 
-### Variáveis de Ambiente
+Envie o token no cabeçalho `Authorization: Bearer SEU_TOKEN`. Nunca inclua esse token na URL.
 
-```bash
-# Obrigatório
-export QUARKS_API_TOKEN="seu-token-aqui"
+## Ferramentas
 
-# Opcional (mas recomendado para operações de criação/modificação)
-export QUARKS_CHAVE_KEY="sua-chave-aqui"
-export QUARKS_SECRET_KEY="seu-secret-aqui"
+O serviço expõe as ferramentas de agendamentos, agendas, convênios e profissionais definidas em `src/tools/quarks-tools.js`. A lista efetiva pode ser consultada em `GET /mcp/tools` com autenticação válida. Nomes técnicos de ferramentas são mantidos para compatibilidade; descrições e documentação devem permanecer em português.
 
-# Opcional - URL customizada da API
-export QUARKS_API_URL="https://api.quark.tec.br/clinic/ext/v1"
-```
+## Implantação em um único local
 
-### Instalação
+Configure as variáveis de ambiente no serviço de hospedagem usado pela clínica. Não é necessário configurar múltiplas unidades de instalação do FAVMED; os identificadores de agenda, convênio, profissional e unidade enviados à API continuam dependendo do cadastro existente na Quarks. Não fixe um `unidadeId` no código sem confirmar o identificador correto com o administrador da clínica.
 
-```bash
-npm install
-```
+Use HTTPS em qualquer ambiente acessível pela rede. Restrinja o acesso ao servidor e ao painel de hospedagem a pessoas autorizadas. Antes de usar dados reais, valide o token, as permissões da API e os fluxos de consulta e alteração com dados de teste.
 
-### Execução
+## Testes e validação
 
-```bash
-npm start
-```
+- `npm test` — executa os testes automatizados presentes no projeto.
+- `npm start` — inicia o servidor.
 
-## Ferramentas Disponíveis
-
-### 📅 Agendas (5 ferramentas)
-
-1. **listar_agendas** - Lista todas as agendas
-2. **buscar_agenda** - Busca agenda por ID
-3. **buscar_horarios_livres** - Verifica disponibilidade
-4. **buscar_horarios_bloqueados** - Lista bloqueios
-5. **buscar_horarios_permitidos** - Lista horários permitidos
-
-### 📋 Agendamentos (8 ferramentas)
-
-1. **listar_agendamentos** - Lista com filtros avançados
-2. **buscar_agendamento** - Busca por ID
-3. **criar_agendamento** - Cria novo agendamento ⚠️ Requer X-Chave-Key e X-Secret-Key
-4. **cancelar_agendamento** - Cancela agendamento ⚠️ Requer X-Chave-Key e X-Secret-Key
-5. **confirmar_agendamento** - Confirma agendamento ⚠️ Requer X-Chave-Key e X-Secret-Key
-6. **mudar_status_agendamento** - Muda status
-7. **buscar_historico_status** - Histórico de alterações
-
-### 🏥 Convênios (2 ferramentas)
-
-1. **listar_convenios** - Lista todos os convênios
-2. **buscar_convenio** - Busca por ID
-
-### 👨‍⚕️ Profissionais (2 ferramentas)
-
-1. **listar_profissionais** - Lista todos os profissionais
-2. **buscar_profissional** - Busca por ID
-
-## Status Disponíveis para Agendamentos
-
-A API Quarks suporta os seguintes status:
-
-- `LIVRE` - Horário livre
-- `AVALIACAO` - Em avaliação
-- `HORARIO_BLOQUEADO` - Horário bloqueado
-- `AGENDADO` - Agendado
-- `CANCELADO` - Cancelado
-- `CANCELADO_VIA_SMS` - Cancelado via SMS
-- `CONFIRMADO` - Confirmado
-- `FALTOU` - Paciente faltou
-- `AGUARDANDO_RECEPCAO` - Aguardando recepção
-- `RECEPCAO` - Na recepção
-- `AGUARDANDO_PRE_CONSULTA` - Aguardando pré-consulta
-- `PRE_CONSULTA` - Em pré-consulta
-- `AGUARDANDO_ATENDIMENTO` - Aguardando atendimento
-- `EM_ATENDIMENTO` - Em atendimento
-- `AGUARDANDO_POS_CONSULTA` - Aguardando pós-consulta
-- `POS_CONSULTA` - Em pós-consulta
-- `ATENDIMENTO_COMPLETO` - Atendimento completo
-- `PRE_AGENDAMENTO` - Pré-agendamento
-- `AUSENTE_POS_CONSULTA` - Ausente pós-consulta
-- `EXCLUIDO` - Excluído
-- `TRANSFERIDO` - Transferido
-- `REAGENDADO` - Reagendado
-- `PAGAMENTO_AGUARDANDO` - Aguardando pagamento
-- `PAGAMENTO_INFORMADO` - Pagamento informado
-
-## Exemplos de Uso
-
-### Verificar Horários Livres
-
-```javascript
-// Primeiro, liste as agendas disponíveis
-listar_agendas({ page: 1 })
-
-// Depois, busque os horários livres de uma agenda específica
-buscar_horarios_livres({
-  id: 123,
-  data: "2024-12-25"
-})
-```
-
-### Criar um Agendamento
-
-```javascript
-criar_agendamento({
-  agendaId: 123,
-  convenioId: 456,
-  data: "2024-12-25",
-  especialidadeId: 789,
-  hora: "14:30",
-  nomePaciente: "João Silva",
-  pacienteId: 1011,
-  procedimentosIds: [0],
-  telefonePaciente: "(11) 99999-9999",
-  telemedicina: false,
-  unidadeId: 1
-})
-```
-
-### Buscar Agendamentos por Período
-
-```javascript
-listar_agendamentos({
-  data_agendamento_inicio: "2024-12-01",
-  data_agendamento_fim: "2024-12-31",
-  status: ["AGENDADO", "CONFIRMADO"],
-  page: 1
-})
-```
-
-### Histórico de um Agendamento
-
-```javascript
-// Ver todas as mudanças de status
-buscar_historico_status({ id: 12345 })
-```
-
-## Formato de Datas
-
-Todas as datas devem ser fornecidas no formato `YYYY-MM-DD` (ex: `2024-12-31`). O MCP converte automaticamente para o formato esperado pela API (`dd-MM-yyyy`).
-
-## Formato de Horários
-
-Horários devem ser no formato `HH:mm` (ex: `14:30`, `09:00`).
-
-## Formato de Telefone
-
-Telefones devem incluir DDD com parênteses: `(99) 99999-9999`
-
-## Observações Importantes
-
-1. **Operações que modificam dados** (criar, cancelar, confirmar) requerem `X-Chave-Key` e `X-Secret-Key` configurados
-2. **Paginação** começa em `1` (não em `0`)
-3. **Arrays de status** podem ser usados para filtrar múltiplos status simultaneamente
-4. **Todas as respostas** retornam o formato padrão da API Quarks: `{ status, response, errorDetail }`
-
-## Documentação da API
-
-Base URL: `https://api.quark.tec.br/clinic/ext/v1`
-
-Para mais informações sobre a API Quarks, consulte a documentação oficial.
+A versão deve ser testada no ambiente de hospedagem antes do uso clínico. Este repositório não substitui os controles de acesso da API Quarks nem as políticas internas de proteção de dados da clínica.
 
 ## Licença
 
