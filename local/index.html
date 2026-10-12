@@ -25,7 +25,8 @@ main{max-width:1400px;margin:auto;padding:26px clamp(14px,3vw,32px) 40px}.hero{d
  <div class="datebox" id="today"></div>
 </header>
 <main>
- <section class="hero"><div><div class="eyebrow">Painel de atendimento</div><h2>Fila de espera</h2><p>Organize as chamadas e anuncie o paciente por voz.</p></div><div class="hero-actions"><div class="localtag" style="margin-bottom:10px">● MODO LOCAL · SEM CREDENCIAIS</div><button class="btn primary" id="openDisplay" type="button">▣ Abrir tela da sala de espera</button></div></section>\n <section class="public-screen" id="publicScreen"><div class="screen-label">FAVMED · CHAMADAS</div><div class="called-display" id="calledDisplay"></div><div class="screen-footer">Aguarde o anúncio por voz e dirija-se ao consultório indicado.</div></section>
+ <section class="hero"><div><div class="eyebrow">Painel de atendimento</div><h2>Fila de espera</h2><p>Organize as chamadas e anuncie o paciente por voz.</p></div><div class="hero-actions"><div class="localtag" style="margin-bottom:10px">● MODO LOCAL · SEM CREDENCIAIS</div><button class="btn primary" id="openDisplay" type="button">▣ Abrir tela da sala de espera</button></div></section>
+ <section class="public-screen" id="publicScreen"><div class="screen-label">FAVMED · CHAMADAS</div><div class="called-display" id="calledDisplay"></div><div class="screen-footer">Aguarde o anúncio por voz e dirija-se ao consultório indicado.</div></section>
  <section class="stats">
   <div class="stat"><span>Aguardando</span><strong id="waitingCount">0</strong></div>
   <div class="stat"><span>Chamado</span><strong class="teal" id="calledCount">0</strong></div>
@@ -59,12 +60,14 @@ main{max-width:1400px;margin:auto;padding:26px clamp(14px,3vw,32px) 40px}.hero{d
 <script>
 (function(){
 "use strict";
-const KEY="favmed_local_queue_v1";\nconst publicMode=new URLSearchParams(location.search).get("painel")==="1";
+const KEY="favmed_local_queue_v1";
+const publicMode=new URLSearchParams(location.search).get("painel")==="1";
 let patients=[];
 let lastAnnouncement="";
 let voices=[];
 const $=id=>document.getElementById(id);
-const todayKey=new Date().getFullYear()+"-"+String(new Date().getMonth()+1).padStart(2,"0")+"-"+String(new Date().getDate()).padStart(2,"0");\nif(publicMode){document.body.classList.add("public-mode");document.title="FAVMED | Chamadas da sala de espera";}
+const todayKey=new Date().getFullYear()+"-"+String(new Date().getMonth()+1).padStart(2,"0")+"-"+String(new Date().getDate()).padStart(2,"0");
+if(publicMode){document.body.classList.add("public-mode");document.title="FAVMED | Chamadas da sala de espera";}
 $("today").textContent=new Date().toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"long",year:"numeric"});
 function load(){try{const raw=localStorage.getItem(KEY);patients=raw?JSON.parse(raw):[];if(!Array.isArray(patients))patients=[];}catch(e){patients=[];notify("Não foi possível ler os dados salvos neste navegador.");}}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(patients));}catch(e){notify("Armazenamento indisponível. Exporte a fila para não perder os dados.");}}
@@ -78,7 +81,12 @@ function render(){
  $("patientList").innerHTML=visible.length?visible.map((p,i)=>'<article class="patient '+(p.status==="Chamado"?"called":p.status==="Atendido"?"attended":"")+'"><div class="number">'+(i+1)+'</div><div><div class="pname">'+esc(p.name)+'</div><div class="meta">'+esc(p.service||"Atendimento")+' · '+esc(p.room)+' · chegada '+esc(p.time)+'</div><div class="status '+(p.status==="Chamado"?"called":p.status==="Atendido"?"attended":"waiting")+'">'+esc(p.status)+'</div></div><div class="pactions">'+(p.status!=="Atendido"?'<button class="btn primary" data-action="call" data-id="'+p.id+'">🔊 Chamar</button><button class="btn secondary" data-action="attend" data-id="'+p.id+'">✓ Atendido</button>':'<button class="btn ghost" data-action="restore" data-id="'+p.id+'">Reabrir</button>')+'<button class="btn ghost" data-action="remove" data-id="'+p.id+'" aria-label="Remover paciente">✕</button></div></article>').join(""):'<div class="empty"><b>Nenhum paciente na fila</b>Adicione um paciente no formulário ao lado para começar.</div>';
  counts();
 }
-function renderPublic(){\n let called=patients.filter(p=>p.day===todayKey&&p.status==="Chamado").sort((a,b)=>(b.calledAt||b.created)-(a.calledAt||a.created));\n const box=$("calledDisplay");if(!box)return;\n box.innerHTML=called.length?called.map(p=>'<article class="called-card"><div class="call-label">PACIENTE CHAMADO</div><div class="call-name">'+esc(p.name)+'</div><div class="call-room">➜ '+esc(p.room)+'</div></article>').join(""):'<div class="no-calls"><strong>Aguardando próxima chamada</strong>Por favor, aguarde. Seu nome será anunciado aqui.</div>';\n}\nfunction announce(p){const text="Paciente "+p.name+". Por favor, compareça ao "+p.room+".";
+function renderPublic(){
+ let called=patients.filter(p=>p.day===todayKey&&p.status==="Chamado").sort((a,b)=>(b.calledAt||b.created)-(a.calledAt||a.created));
+ const box=$("calledDisplay");if(!box)return;
+ box.innerHTML=called.length?called.map(p=>'<article class="called-card"><div class="call-label">PACIENTE CHAMADO</div><div class="call-name">'+esc(p.name)+'</div><div class="call-room">➜ '+esc(p.room)+'</div></article>').join(""):'<div class="no-calls"><strong>Aguardando próxima chamada</strong>Por favor, aguarde. Seu nome será anunciado aqui.</div>';
+}
+function announce(p){const text="Paciente "+p.name+". Por favor, compareça ao "+p.room+".";
  lastAnnouncement=text;
  if(!("speechSynthesis" in window)||!("SpeechSynthesisUtterance" in window)){notify("Este navegador não oferece leitura de voz. Use Edge ou Chrome atualizado.");return;}
  window.speechSynthesis.cancel();
@@ -110,9 +118,10 @@ $("callNext").addEventListener("click",()=>{const p=patients.filter(x=>x.day===t
 $("repeatLast").addEventListener("click",()=>{if(!lastAnnouncement){notify("Ainda não houve chamada nesta sessão.");return;}if(!("speechSynthesis"in window)){notify("Leitura de voz indisponível neste navegador.");return;}window.speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(lastAnnouncement);u.lang="pt-BR";u.rate=.88;u.pitch=1.05;const v=voices.find(x=>x.name===$("voiceSelect").value)||voices.find(x=>/^pt/i.test(x.lang));if(v){u.voice=v;u.lang=v.lang;}window.speechSynthesis.speak(u);});
 $("testVoice").addEventListener("click",()=>{lastAnnouncement="Teste de voz. Chamador de pacientes FAVMED. Por favor, compareça ao consultório.";if(!("speechSynthesis"in window)){notify("Leitura de voz indisponível neste navegador.");return;}const u=new SpeechSynthesisUtterance(lastAnnouncement);u.lang="pt-BR";u.rate=.88;u.pitch=1.05;const v=voices.find(x=>x.name===$("voiceSelect").value)||voices.find(x=>/^pt/i.test(x.lang));if(v){u.voice=v;u.lang=v.lang;}window.speechSynthesis.cancel();window.speechSynthesis.speak(u);});
 $("clearAttended").addEventListener("click",()=>{const n=patients.filter(p=>p.day===todayKey&&p.status==="Atendido").length;if(!n){notify("Não há atendidos para limpar.");return;}if(confirm("Remover "+n+" paciente(s) atendido(s) da lista de hoje?")){patients=patients.filter(p=>!(p.day===todayKey&&p.status==="Atendido"));save();render();}});
-$("exportCsv").addEventListener("click",()=>{const rows=[["Nome","Consultório","Atendimento","Status","Data","Hora de chegada"],...patients.filter(p=>p.day===todayKey).map(p=>[p.name,p.room,p.service,p.status,p.day,p.time])];const csv="\ufeff"+rows.map(r=>r.map(v=>'"'+String(v??"").replace(/"/g,'""')+'"').join(";")).join("\r\n");const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="favmed-fila-"+todayKey+".csv";a.click();URL.revokeObjectURL(url);});
+$("exportCsv").addEventListener("click",()=>{const rows=[["Nome","Consultório","Atendimento","Status","Data","Hora de chegada"],...patients.filter(p=>p.day===todayKey).map(p=>[p.name,p.room,p.service,p.status,p.day,p.time])];const csv="\ufeff"+rows.map(r=>r.map(v=>'"'+String(v??"").replace(/"/g,'""')+'"').join(";")).join("\r
+");const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="favmed-fila-"+todayKey+".csv";a.click();URL.revokeObjectURL(url);});
 $("search").addEventListener("input",render);
-load();if(publicMode){renderPublic();window.addEventListener("storage",e=>{if(e.key===KEY){load();renderPublic();}});setInterval(()=>{load();renderPublic();},1200);}else{fillVoices();if("speechSynthesis"in window)window.speechSynthesis.onvoiceschanged=fillVoices;render();const opener=$("openDisplay");if(opener)opener.addEventListener("click",()=>window.open(location.pathname+"?painel=1","favmedSalaEspera","noopener"));}
+load();if(publicMode){renderPublic();window.addEventListener("storage",e=>{if(e.key===KEY){load();renderPublic();}});setInterval(()=>{load();renderPublic();},1200);}else{fillVoices();if("speechSynthesis"in window)window.speechSynthesis.onvoiceschanged=fillVoices;render();const opener=$("openDisplay");if(opener)opener.addEventListener("click",()=>window.open(location.href.split("?")[0]+"?painel=1","favmedSalaEspera","noopener"));}
 })();
 </script>
 </body>
