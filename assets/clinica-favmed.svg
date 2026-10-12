@@ -1,15 +1,8 @@
-<?xml version="1.0" standalone="no"?>
-<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 20010904//EN"
- "http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd">
-<svg version="1.0" xmlns="http://www.w3.org/2000/svg"
- width="348.000000pt" height="453.000000pt" viewBox="0 0 348.000000 453.000000"
- preserveAspectRatio="xMidYMid meet">
-<metadata>
-Created by potrace 1.16, written by Peter Selinger 2001-2019
-</metadata>
-<g transform="translate(0.000000,453.000000) scale(0.100000,-0.100000)"
-fill="#000000" stroke="none">
-<path d="M0 2265 l0 -2265 1740 0 1740 0 0 2265 0 2265 -1740 0 -1740 0 0
--2265z"/>
-</g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="titulo descricao">
+  <title id="titulo">Clínica Favmed - Medicina Ocupacional</title>
+  <desc id="descricao">Símbolo de saúde em verde-escuro com cruz médica branca.</desc>
+  <rect width="256" height="256" rx="52" fill="#123b3a"/>
+  <circle cx="190" cy="65" r="20" fill="#64d6b2"/>
+  <path d="M104 42h48v62h62v48h-62v62h-48v-62H42v-48h62z" fill="#fff"/>
+  <path d="M36 222h184" stroke="#64d6b2" stroke-width="8" stroke-linecap="round"/>
 </svg>
