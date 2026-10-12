@@ -1,26 +1,29 @@
 {
-  "name": "mcp_quarks",
-  "version": "2.0.0",
-  "description": "MCP Server para integração completa com API Quarks - Agendamentos, Agendas, Convênios e Profissionais",
+  "name": "clinica-favmed-mcp",
+  "version": "2.1.0",
+  "description": "Servidor seguro de integração da Clínica Favmed - Medicina Ocupacional com a API Quarks",
   "type": "module",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "mcp": "node index.js"
+    "mcp": "node server.js",
+    "test": "node --test"
   },
   "keywords": [
-    "mcp",
+    "favmed",
+    "medicina-ocupacional",
+    "clinica",
     "quarks",
     "agendamentos",
-    "clinic",
-    "healthcare",
     "model-context-protocol",
-    "api",
-    "rest"
+    "api"
   ],
-  "author": "",
+  "author": "Clínica Favmed - Medicina Ocupacional",
   "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
