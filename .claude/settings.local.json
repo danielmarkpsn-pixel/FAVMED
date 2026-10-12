@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(cat:*)",
+      "Bash(curl:*)",
+      "Bash(npm start)",
+      "Bash(node:*)",
+      "Bash({)",
+      "Bash(\"swagger\": \"2.0\",)",
+      "Bash(\"info\": {)",
+      "Bash(\"description\": \"API de acesso aos recursos do QuarkClinic...\",)",
+      "Bash(...)",
+      "Bash(EOF)"
+    ]
+  }
+}
