@@ -1,0 +1,41 @@
+name: Validar FAVMED
+
+on:
+  push:
+    branches:
+      - main
+      - correcao-seguranca-2.1
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  validar:
+    name: Verificar código Node.js
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package.json
+
+      - name: Instalar dependências
+        run: npm install
+
+      - name: Verificar sintaxe JavaScript
+        run: |
+          node --check server.js
+          node --check src/routes/mcp.js
+          node --check src/routes/health.js
+          node --check src/handlers/mcpHandler.js
+          node --check src/tools/api-request.js
+          node --check src/tools/index.js
+          node --check src/tools/quarks-tools.js
+
+      - name: Executar testes
+        run: npm test
