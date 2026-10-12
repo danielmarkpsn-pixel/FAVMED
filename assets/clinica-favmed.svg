@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="titulo descricao">
+  <title id="titulo">Clínica Favmed - Medicina Ocupacional</title>
+  <desc id="descricao">Símbolo de saúde em verde-escuro com cruz médica branca.</desc>
+  <rect width="256" height="256" rx="52" fill="#123b3a"/>
+  <circle cx="190" cy="65" r="20" fill="#64d6b2"/>
+  <path d="M104 42h48v62h62v48h-62v62h-48v-62H42v-48h62z" fill="#fff"/>
+  <path d="M36 222h184" stroke="#64d6b2" stroke-width="8" stroke-linecap="round"/>
+</svg>
