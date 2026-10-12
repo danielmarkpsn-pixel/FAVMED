@@ -42,7 +42,13 @@ O token MCP é uma senha de acesso criada pela clínica. Ele **não** substitui 
 
 ## 4. Obter credenciais da Quarks
 
-Peça ao administrador da conta Quarks da clínica ou ao suporte oficial da Quarks:
+As credenciais da API não são necessariamente as mesmas do login normal no QuarkClinic. Solicite acesso de integração à API externa ao administrador da conta ou aos canais de suporte oficiais. A central de ajuda do QuarkClinic informa suporte pelo chat dentro do próprio sistema e WhatsApp; os termos de uso também listam os e-mails `cs@quark.tec.br` e `quarkclinic@quark.tec.br`.
+
+- Central de perguntas frequentes: https://quark.tec.br/clinic/perguntas/
+- Base de conhecimento do QuarkClinic: https://quarktec.atlassian.net/wiki/spaces/BCCLINIC/overview
+- Site oficial da Quark Tecnologia: https://quark.tec.br/
+
+Peça ao administrador ou suporte:
 
 - confirmação de que a conta possui acesso à API externa de clínica;
 - URL/base da API aplicável à conta;
@@ -52,6 +58,10 @@ Peça ao administrador da conta Quarks da clínica ou ao suporte oficial da Quar
 - ambiente de testes, se disponível, e instruções de rotação/revogação.
 
 Solicite credenciais individuais ou de integração com privilégios mínimos, não a senha pessoal de um funcionário. Não envie credenciais aqui e não as coloque em arquivos públicos. Preencha `QUARKS_API_TOKEN`, `QUARKS_CHAVE_KEY` e `QUARKS_SECRET_KEY` apenas no `.env` local, conforme orientação oficial. Se o fornecedor não reconhecer algum desses nomes, confirme com ele o mecanismo de autenticação correto antes de prosseguir.
+
+### Mensagem pronta para enviar ao suporte
+
+> Olá! Somos usuários do QuarkClinic e estamos configurando uma integração interna chamada Clínica Favmed - Medicina Ocupacional. Precisamos confirmar se nossa conta tem acesso autorizado à API externa de clínica e solicitar a documentação atual, URL/base correta, método de autenticação, credenciais de integração e permissões mínimas para consultar agendas e agendamentos. Também gostaríamos de saber se existe ambiente de testes e qual o procedimento de rotação/revogação das chaves. Não precisamos compartilhar a senha de um usuário; queremos credenciais próprias para integração. Obrigado.
 
 ## 5. Iniciar e testar no próprio computador
 
