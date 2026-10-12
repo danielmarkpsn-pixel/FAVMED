@@ -32,12 +32,31 @@ try {
   Write-Host "Tela sala de espera: http://127.0.0.1:$Port/?painel=1"
   Write-Host ""
   Write-Host "Enderecos para outros dispositivos:" -ForegroundColor Yellow
-  $ips = [System.Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces() |
-    Where-Object { $_.OperationalStatus -eq "Up" -and $_.NetworkInterfaceType -ne "Loopback" } |
-    ForEach-Object { $_.GetIPProperties().UnicastAddresses } |
-    Where-Object { $_.Address.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork -and $_.Address.ToString() -notlike "169.254.*" } |
-    ForEach-Object { $_.Address.ToString() } | Select-Object -Unique
-  foreach ($ip in $ips) { Write-Host "Recepcao: http://${ip}:$Port/"; Write-Host "Sala:     http://${ip}:$Port/?painel=1" }
+  $ips = @()
+  # Prioriza a interface IPv4 ativa com gateway (normalmente Wi-Fi ou cabo).
+  try {
+    $ips += Get-NetIPConfiguration -ErrorAction Stop |
+      Where-Object { $_.NetAdapter.Status -eq "Up" -and $_.IPv4DefaultGateway -ne $null } |
+      ForEach-Object { $_.IPv4Address } |
+      Where-Object { $_.IPAddress -and $_.IPAddress -notlike "127.*" -and $_.IPAddress -notlike "169.254.*" } |
+      ForEach-Object { $_.IPAddress }
+  } catch { }
+  # Alternativa para sistemas sem o cmdlet ou sem gateway detectado.
+  if ($ips.Count -eq 0) {
+    $ips += [System.Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces() |
+      Where-Object { $_.OperationalStatus -eq "Up" -and $_.NetworkInterfaceType -ne "Loopback" } |
+      ForEach-Object { $_.GetIPProperties().UnicastAddresses } |
+      Where-Object { $_.Address.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork -and $_.Address.ToString() -notlike "169.254.*" -and $_.Address.ToString() -notlike "127.*" } |
+      ForEach-Object { $_.Address.ToString() }
+  }
+  $ips = @($ips | Select-Object -Unique)
+  if ($ips.Count -eq 0) {
+    Write-Host "AVISO: nao consegui detectar um IPv4 da rede. Verifique se o computador esta conectado ao Wi-Fi ou cabo." -ForegroundColor Yellow
+  } else {
+    foreach ($ip in $ips) { Write-Host ("Recepcao: http://{0}:{1}/" -f $ip, $Port); Write-Host ("Sala:     http://{0}:{1}/?painel=1" -f $ip, $Port) }
+  }
+  # Abre automaticamente o sistema no navegador da recepcao.
+  try { Start-Process ("http://127.0.0.1:{0}/" -f $Port) } catch { Write-Host "Abra manualmente o endereco local mostrado acima." -ForegroundColor Yellow }
   Write-Host ""
   Write-Host "Mantenha esta janela aberta. Pressione Ctrl+C para encerrar." -ForegroundColor Green
   while ($listener.Server.IsBound) {
@@ -62,7 +81,7 @@ try {
       $request = $lines[0] -split " "
       if ($request.Count -lt 2) { continue }
       $method = $request[0].ToUpperInvariant()
-      $path = ($request[1] -split "?")[0]
+      $path = $request[1].Split('?')[0]
       $contentLength = 0
       foreach ($line in $lines) { if ($line -match "(?i)^Content-Length:\s*(\d+)") { $contentLength = [int]$Matches[1] } }
       $bodyBytes = New-Object byte[] $contentLength
