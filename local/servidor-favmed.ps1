@@ -5,7 +5,7 @@ $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $DataFile = Join-Path $Root "fila.json"
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 if (-not (Test-Path $DataFile)) { [System.IO.File]::WriteAllText($DataFile, "[]", $Utf8NoBom) }
-$listener = New-Object System.Net.Sockets.TcpListener([System.Net.IPAddress]::Any, $Port)
+$listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Any, $Port)
 try {
   $listener.Start()
   Write-Host ""
