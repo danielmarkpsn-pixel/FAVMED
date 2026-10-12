@@ -26,7 +26,7 @@ Aplicativo local para a recepção, com tela de sala de espera acessível por ou
 ## Segurança e limitações
 - O computador da recepção deve permanecer ligado, com o servidor PowerShell aberto, para a tela de rede funcionar.
 - O IP pode mudar quando o roteador reinicia. Se o endereço parar de funcionar, feche e reabra o servidor e use o IP exibido.
-- O firewall deve liberar TCP 8080 apenas na rede privada/confiável. Não crie regra para rede pública e não encaminhe a porta no roteador para a internet.
+- O firewall deve liberar a porta TCP mostrada pelo servidor (normalmente 8080; pode usar 8081, 8082, 8090 ou 8765 se a porta principal estiver ocupada), apenas na rede privada/confiável. Não crie regra para rede pública e não encaminhe a porta no roteador para a internet.
 - Qualquer dispositivo com acesso a esse endereço na rede pode ver os nomes chamados. Use somente uma rede interna confiável e mostre apenas os dados mínimos necessários; não insira diagnóstico, CPF ou informações clínicas.
 - A fila fica no arquivo `local\fila.json` quando o servidor é iniciado. Faça cópias de segurança manualmente e restrinja o acesso à pasta.
 - A versão de rede não é criptografada e não possui login. Não use em Wi-Fi de visitantes nem exponha à internet.
