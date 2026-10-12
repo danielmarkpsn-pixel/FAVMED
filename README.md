@@ -24,22 +24,25 @@ Servidor de integração MCP com a API Quarks para apoiar as rotinas de agendame
 - Verificação de saúde simplificada, sem revelar configuração interna.
 - Script `npm run mcp` corrigido para iniciar o servidor existente.
 
+## Guia recomendado: computador Windows na rede local
+
+Siga o guia completo: **[Configuração local do Windows e rede da clínica](docs/CONFIGURACAO-LOCAL-WINDOWS.md)**.
+
+Ele explica os requisitos do computador, instalação, criação do arquivo privado `.env`, geração de token de acesso, regras do Firewall do Windows e os dados a solicitar à Quarks. Não encaminhe a porta do servidor para a internet.
+
 ## Requisitos
 
 - Node.js 20 ou superior
 - Credenciais válidas da API Quarks
 - Um token privado para autenticar o cliente MCP
 
-## Configuração local
+## Configuração resumida
 
-1. No GitHub, baixe o código como ZIP ou clone o repositório.
-2. Crie um arquivo local chamado `.env` usando `.env.example` como modelo.
-3. Preencha no arquivo `.env`:
-   - `MCP_AUTH_TOKEN`: token privado longo e aleatório para proteger o acesso ao MCP.
-   - `QUARKS_API_TOKEN`: token fornecido pela Quarks.
-   - `QUARKS_CHAVE_KEY` e `QUARKS_SECRET_KEY`: chaves fornecidas pela Quarks, quando exigidas.
-4. Instale as dependências com `npm install`.
-5. Inicie com `npm start`.
+1. Baixe e extraia o projeto no computador da clínica.
+2. Copie `.env.example` para um arquivo local chamado `.env`.
+3. Configure `MCP_AUTH_TOKEN` com um token aleatório forte.
+4. Configure as credenciais Quarks somente após obtê-las de uma fonte autorizada.
+5. Instale as dependências com `npm install` e inicie com `npm start`.
 
 Não publique o arquivo `.env`, nem coloque credenciais reais em commits, capturas de tela ou mensagens. Se alguma credencial verdadeira já foi publicada no histórico do GitHub, substitua-a junto ao fornecedor; apagar o arquivo atual não remove cópias antigas do histórico.
 
@@ -72,18 +75,18 @@ Envie o token no cabeçalho `Authorization: Bearer SEU_TOKEN`. Nunca inclua esse
 
 O serviço expõe as ferramentas de agendamentos, agendas, convênios e profissionais definidas em `src/tools/quarks-tools.js`. A lista efetiva pode ser consultada em `GET /mcp/tools` com autenticação válida. Nomes técnicos de ferramentas são mantidos para compatibilidade; descrições e documentação devem permanecer em português.
 
-## Implantação em um único local
+## Uso em uma única clínica
 
-Configure as variáveis de ambiente no serviço de hospedagem usado pela clínica. Não é necessário configurar múltiplas unidades de instalação do FAVMED; os identificadores de agenda, convênio, profissional e unidade enviados à API continuam dependendo do cadastro existente na Quarks. Não fixe um `unidadeId` no código sem confirmar o identificador correto com o administrador da clínica.
+Configure as variáveis de ambiente no computador servidor. Os identificadores de agenda, convênio, profissional e unidade enviados à API continuam dependendo do cadastro existente na Quarks. Não fixe um `unidadeId` no código sem confirmar o identificador correto com o administrador da clínica.
 
-Use HTTPS em qualquer ambiente acessível pela rede. Restrinja o acesso ao servidor e ao painel de hospedagem a pessoas autorizadas. Antes de usar dados reais, valide o token, as permissões da API e os fluxos de consulta e alteração com dados de teste.
+Restrinja o acesso à rede interna e ao computador servidor a pessoas autorizadas. Antes de usar dados reais, valide o token, as permissões da API e os fluxos de consulta e alteração com dados de teste.
 
 ## Testes e validação
 
 - `npm test` — executa os testes automatizados presentes no projeto.
 - `npm start` — inicia o servidor.
 
-A versão deve ser testada no ambiente de hospedagem antes do uso clínico. Este repositório não substitui os controles de acesso da API Quarks nem as políticas internas de proteção de dados da clínica.
+A versão deve ser testada no ambiente da clínica antes do uso real. Este repositório não substitui os controles de acesso da API Quarks nem as políticas internas de proteção de dados da clínica.
 
 ## Licença
 
