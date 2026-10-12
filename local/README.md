@@ -1,30 +1,35 @@
 # FAVMED Local — Chamador de pacientes para Windows
 
-Versão local e independente para um único computador. Não exige credenciais Quarks, Node.js, servidor, conta ou instalação de programas.
+Aplicativo local para a recepção, com tela de sala de espera acessível por outro computador ou dispositivo na mesma rede Wi-Fi/Ethernet. Não exige Node.js nem instalar programas adicionais; usa o PowerShell que acompanha o Windows.
 
-## Como usar
-1. Baixe o ZIP do branch \`favmed-local-chamador-windows\` pelo GitHub.
-2. Extraia a pasta em um local do computador.
-3. Abra a pasta \`local\` e dê dois cliques em \`index.html\`.
-4. Use Microsoft Edge ou Google Chrome atualizado.
-5. Cadastre o paciente e o consultório, depois clique em **Chamar** ou **Chamar próximo**.
-6. Clique em **Testar voz** para verificar o áudio. O app tenta selecionar uma voz em português do Brasil que pareça feminina, entre as vozes disponibilizadas pelo Windows/navegador. A identificação de gênero pelo nome é apenas uma estimativa; se não houver voz feminina em português instalada, o navegador pode usar outra voz disponível.
-7. Para abrir uma tela exclusiva para a sala de espera, clique em **Abrir tela da sala de espera**. Se solicitado, permita a abertura da nova janela. Coloque essa janela na segunda tela/TV e pressione F11 para tela cheia. Ela mostra apenas os pacientes chamados e o consultório, atualizando automaticamente a partir da tela da recepção, no mesmo navegador e computador.
+## Arquivos
+- `index.html`: interface do chamador.
+- `logo-favmed.png`: logotipo.
+- `servidor-favmed.ps1`: servidor local e armazenamento compartilhado da fila.
+- `INSTRUCOES-REDE-LOCAL.txt`: passo a passo de configuração, firewall e acesso à tela pública.
+- `ABRIR-FAVMED.bat`: abre a versão simples por arquivo, para uso em um computador.
+- `INICIAR-SERVIDOR-FAVMED.bat`: inicia o modo de rede local.
 
-## Recursos
-- Fila diária com status aguardando, chamado e atendido.
-- Chamada falada em português com nome do paciente e consultório.
-- Repetição da última chamada.
-- Tela pública adicional para sala de espera, com nome e consultório em letras grandes e atualização automática.
-- Busca, remoção, reabertura e exportação CSV.
-- Persistência local no armazenamento do navegador.
+## Início rápido
+1. Baixe o ZIP do branch `favmed-local-chamador-windows` e extraia tudo para uma pasta permanente no computador da recepção.
+2. Leia `INSTRUCOES-REDE-LOCAL.txt` antes do primeiro uso em rede.
+3. Dê dois cliques em `INICIAR-SERVIDOR-FAVMED.bat` no computador da recepção. Se o Firewall do Windows perguntar, permita acesso **somente em redes privadas**.
+4. No outro computador, tablet ou TV com navegador, abra o endereço IP informado pelo servidor, acrescentando `/?painel=1`. Exemplo: `http://192.168.1.25:8080/?painel=1`.
+5. Na recepção, acesse o endereço-base informado pelo servidor (sem `?painel=1`) para cadastrar e chamar pacientes.
 
-## Limites importantes
-- Esta versão **não se conecta ao Quarks** e não importa agenda automaticamente.
-- Os dados ficam no perfil do navegador desse computador; não há sincronização nem backup automático. A tela de sala de espera foi pensada para abrir como segunda janela no mesmo computador e navegador; não é uma tela de rede para outro computador. Use **Exportar CSV** para guardar uma cópia quando necessário.
-- O armazenamento do navegador não é criptografado e não deve ser tratado como prontuário. Como se trata de ambiente clínico, restrinja o acesso ao Windows e evite inserir dados clínicos sensíveis.
-- Para manter o uso local, não publique a fila de pacientes nem arquivos exportados no GitHub.
-- A fala depende do suporte de síntese de voz do navegador e das vozes disponíveis no Windows. Permita áudio e mantenha o volume ligado.
+## Aparência e recursos
+- Interface clara, com branco, cinza-claro e azul-petróleo.
+- Cadastro manual, chamada por voz, repetição, busca, status, remoção e exportação CSV.
+- Tela pública em letras grandes, com nome do paciente chamado e consultório, atualizada pela rede local.
+- Dados da fila compartilhados por um arquivo JSON no computador da recepção.
 
-## Privacidade
-O aplicativo não envia os dados da fila a um servidor. A informação permanece no armazenamento local do navegador até ser apagada pelo usuário ou pelo próprio navegador. Limpar os dados do navegador pode apagar a fila.
+## Segurança e limitações
+- O computador da recepção deve permanecer ligado, com o servidor PowerShell aberto, para a tela de rede funcionar.
+- O IP pode mudar quando o roteador reinicia. Se o endereço parar de funcionar, feche e reabra o servidor e use o IP exibido.
+- O firewall deve liberar TCP 8080 apenas na rede privada/confiável. Não crie regra para rede pública e não encaminhe a porta no roteador para a internet.
+- Qualquer dispositivo com acesso a esse endereço na rede pode ver os nomes chamados. Use somente uma rede interna confiável e mostre apenas os dados mínimos necessários; não insira diagnóstico, CPF ou informações clínicas.
+- A fila fica no arquivo `local\fila.json` quando o servidor é iniciado. Faça cópias de segurança manualmente e restrinja o acesso à pasta.
+- A versão de rede não é criptografada e não possui login. Não use em Wi-Fi de visitantes nem exponha à internet.
+- A versão aberta diretamente como arquivo continua disponível, mas nesse modo a tela secundária funciona apenas no mesmo navegador/computador.
+
+Crédito: Desenvolvido por Daniel Marques via IA.
