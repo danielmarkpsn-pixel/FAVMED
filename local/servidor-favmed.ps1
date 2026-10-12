@@ -48,7 +48,7 @@ try {
       $method = $request[0].ToUpperInvariant()
       $path = ($request[1] -split "?")[0]
       $contentLength = 0
-      foreach ($line in $lines) { if ($line -match "^(?i)Content-Length:\s*(\d+)") { $contentLength = [int]$Matches[1] } }
+      foreach ($line in $lines) { if ($line -match "(?i)^Content-Length:\s*(\d+)") { $contentLength = [int]$Matches[1] } }
       $bodyBytes = New-Object byte[] $contentLength
       $read = 0
       while ($read -lt $contentLength) {
