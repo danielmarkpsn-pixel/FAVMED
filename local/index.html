@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#101419">
-<title>FAVMED Local | Chamador de pacientes</title>
+<title>Clínica Favmed - Medicina Ocupacional</title>
 <style>
 :root{color-scheme:dark;--bg:#0c1014;--panel:#151b21;--panel2:#1c242c;--line:#2b3741;--text:#edf3f6;--muted:#9aabb5;--teal:#20c5b5;--teal2:#0d857d;--amber:#f1bb61;--red:#f07171}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top right,#17302f 0,transparent 38%),var(--bg);color:var(--text);font:15px/1.45 "Segoe UI",Arial,sans-serif}
@@ -21,12 +21,12 @@ main{max-width:1400px;margin:auto;padding:26px clamp(14px,3vw,32px) 40px}.hero{d
 </head>
 <body>
 <header>
- <div class="brand"><div class="logo">F</div><div><h1>FAVMED <span style="color:var(--teal)">LOCAL</span></h1><p>Chamador de pacientes · Sala de espera</p></div></div>
+ <div class="brand"><div class="logo" aria-label="Logotipo da Clínica Favmed">F</div><div><h1>Clínica Favmed</h1><p>Medicina Ocupacional · Chamador de pacientes</p></div></div>
  <div class="datebox" id="today"></div>
 </header>
 <main>
- <section class="hero"><div><div class="eyebrow">Painel de atendimento</div><h2>Fila de espera</h2><p>Organize as chamadas e anuncie o paciente por voz.</p></div><div class="hero-actions"><div class="localtag" style="margin-bottom:10px">● MODO LOCAL · SEM CREDENCIAIS</div><button class="btn primary" id="openDisplay" type="button">▣ Abrir tela da sala de espera</button></div></section>
- <section class="public-screen" id="publicScreen"><div class="screen-label">FAVMED · CHAMADAS</div><div class="called-display" id="calledDisplay"></div><div class="screen-footer">Aguarde o anúncio por voz e dirija-se ao consultório indicado.</div></section>
+ <section class="hero"><div><div class="eyebrow">Painel de atendimento</div><h2>Fila de espera</h2><p>Organize as chamadas e anuncie o paciente por voz.</p></div><div class="hero-actions"><button class="btn primary" id="openDisplay" type="button">▣ Abrir tela da sala de espera</button></div></section>
+ <section class="public-screen" id="publicScreen"><div class="screen-label">CLÍNICA FAVMED · CHAMADAS</div><div class="called-display" id="calledDisplay"></div><div class="screen-footer">Aguarde o anúncio por voz e dirija-se ao consultório indicado.</div></section>
  <section class="stats">
   <div class="stat"><span>Aguardando</span><strong id="waitingCount">0</strong></div>
   <div class="stat"><span>Chamado</span><strong class="teal" id="calledCount">0</strong></div>
@@ -46,7 +46,7 @@ main{max-width:1400px;margin:auto;padding:26px clamp(14px,3vw,32px) 40px}.hero{d
     <div class="actions"><button class="btn secondary" id="testVoice" type="button">Testar voz</button><button class="btn ghost" id="repeatLast" type="button">Repetir última</button></div>
     <div class="voice-note" id="voiceStatus">A voz depende das vozes instaladas/disponíveis no navegador do Windows.</div>
    </div>
-   <p class="footnote">Os dados ficam salvos neste navegador e neste computador. Não há sincronização com Quarks nem com outros computadores.</p>
+   <p class="footnote">Desenvolvido por Daniel Marques via IA</p>
   </aside>
   <section class="panel">
    <div class="queuehead"><div><h3>Pacientes na fila</h3><p class="sub">Chame, repita a chamada ou finalize o atendimento.</p></div><input class="search" id="search" placeholder="Buscar paciente…" aria-label="Buscar paciente"></div>
@@ -67,7 +67,7 @@ let lastAnnouncement="";
 let voices=[];
 const $=id=>document.getElementById(id);
 const todayKey=new Date().getFullYear()+"-"+String(new Date().getMonth()+1).padStart(2,"0")+"-"+String(new Date().getDate()).padStart(2,"0");
-if(publicMode){document.body.classList.add("public-mode");document.title="FAVMED | Chamadas da sala de espera";}
+if(publicMode){document.body.classList.add("public-mode");document.title="Clínica Favmed - Medicina Ocupacional | Sala de espera";}
 $("today").textContent=new Date().toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"long",year:"numeric"});
 function load(){try{const raw=localStorage.getItem(KEY);patients=raw?JSON.parse(raw):[];if(!Array.isArray(patients))patients=[];}catch(e){patients=[];notify("Não foi possível ler os dados salvos neste navegador.");}}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(patients));}catch(e){notify("Armazenamento indisponível. Exporte a fila para não perder os dados.");}}
