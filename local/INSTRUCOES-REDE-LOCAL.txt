@@ -27,16 +27,16 @@ Método manual (pode exigir uma conta de administrador):
 2. Abra a opção “Regras de Entrada”.
 3. Clique em “Nova Regra...” no painel da direita.
 4. Selecione “Porta” e clique em Avançar.
-5. Marque TCP e “Portas locais específicas”; digite 8080.
+5. Marque TCP e “Portas locais específicas”; digite a porta indicada na janela do servidor (normalmente 8080; se ela estiver ocupada, o programa tentará 8081, 8082, 8090 ou 8765).
 6. Selecione “Permitir a conexão” e clique em Avançar.
 7. Marque somente “Privado”. Deixe “Público” desmarcado. Se a rede corporativa estiver configurada como Domínio, peça ao suporte de TI para avaliar a regra adequada.
-8. Dê o nome “FAVMED - Servidor local TCP 8080” e conclua.
+8. Dê o nome “FAVMED - Servidor local TCP [número da porta]” e conclua.
 9. Se não tiver permissão para criar a regra, peça ao administrador de TI. Não desative o firewall inteiro.
 
 4. INICIAR O SERVIDOR E DESCOBRIR O ENDEREÇO
 1. Execute INICIAR-SERVIDOR-FAVMED.bat no computador da recepção.
 2. Uma janela preta do PowerShell permanecerá aberta e mostrará os endereços disponíveis.
-3. Procure o endereço parecido com http://192.168.1.25:8080/. O número pode ser diferente na sua rede.
+3. Procure o endereço parecido com http://192.168.1.25:8080/. O número da porta pode mudar se 8080 estiver ocupada; copie o endereço completo exibido pelo programa.
 4. Mantenha a janela aberta. Fechar essa janela interrompe a comunicação com a sala de espera.
 5. Se o Windows perguntar sobre rede, permita apenas na rede privada confiável.
 
@@ -67,7 +67,7 @@ Substitua o IP de exemplo pelo endereço real mostrado na janela preta.
 - O IP mudou: feche e reinicie INICIAR-SERVIDOR-FAVMED.bat e use o endereço atualizado.
 - O firewall bloqueou: crie a regra de entrada TCP 8080 somente para o perfil Privado, conforme a seção 3.
 - A tela abre, mas não atualiza: atualize a página (Ctrl+R) e confira se o servidor continua ativo.
-- A porta 8080 já está ocupada: feche outro aplicativo que use essa porta ou peça ao suporte de TI para ajustar a porta no arquivo servidor-favmed.ps1 e também a regra do firewall.
+- Erro “Normalmente é permitida apenas uma utilização de cada endereço de soquete”: a porta já estava ocupada, possivelmente por outra instância do servidor. Esta versão tenta automaticamente 8080, 8081, 8082, 8090 e 8765. Use o endereço completo mostrado. Se for uma porta diferente de 8080, crie a regra de firewall TCP para esse número exato, apenas no perfil Privado. Se todas estiverem ocupadas, feche outras instâncias do FAVMED e tente de novo.
 - A tela pública não fala em voz alta: por segurança, a tela pública só exibe os dados; a voz é reproduzida na recepção.
 
 9. PRIVACIDADE E ENCERRAMENTO
