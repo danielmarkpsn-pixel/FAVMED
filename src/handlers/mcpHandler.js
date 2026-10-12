@@ -1,8 +1,7 @@
 import { tools } from '../tools/index.js';
 
 export async function handleMCPRequest(method, params) {
-  console.log(`[MCP] Method: ${method}`, params);
-
+  // Não registrar parâmetros: chamadas podem incluir informações pessoais de pacientes.
   switch (method) {
     case 'initialize':
       return handleInitialize();
@@ -14,15 +13,13 @@ export async function handleMCPRequest(method, params) {
       return handleToolsCall(params);
 
     case 'notifications/initialized':
-      return handleNotificationsInitialized(params);
+      return handleNotificationsInitialized();
 
     default:
       if (typeof method === 'string' && method.startsWith('notifications/')) {
-        console.log(`[MCP] Ignoring notification method: ${method}`);
         return null;
       }
-
-      throw new Error(`Unknown method: ${method}`);
+      throw new Error('Método MCP não reconhecido.');
   }
 }
 
@@ -30,9 +27,9 @@ function handleInitialize() {
   return {
     protocolVersion: '2024-11-05',
     serverInfo: {
-      name: 'quarks-agendamentos',
-      version: '2.0.0',
-      description: 'MCP Server para integração com API Quarks Clinic - Agendamentos, Agendas, Convênios e Profissionais'
+      name: 'clinica-favmed-medicina-ocupacional',
+      version: '2.1.0',
+      description: 'Integração da Clínica Favmed - Medicina Ocupacional com a API Quarks'
     },
     capabilities: {
       tools: {}
@@ -51,33 +48,28 @@ function handleToolsList() {
 }
 
 async function handleToolsCall(params) {
-  const { name, arguments: args } = params;
+  if (!params || typeof params !== 'object' || Array.isArray(params)) {
+    throw new Error('Parâmetros da ferramenta inválidos.');
+  }
 
-  console.log(`[MCP] Calling tool: ${name}`, args);
+  const { name, arguments: args } = params;
+  if (typeof name !== 'string' || !name) {
+    throw new Error('O nome da ferramenta é obrigatório.');
+  }
 
   const tool = tools[name];
-
-  if (!tool) {
-    throw new Error(`Tool not found: ${name}`);
+  if (!tool) throw new Error('Ferramenta não encontrada.');
+  if (!args || typeof args !== 'object' || Array.isArray(args)) {
+    throw new Error('Os argumentos da ferramenta são obrigatórios e devem ser um objeto.');
   }
 
-  if (!args) {
-    throw new Error('Missing arguments');
-  }
-
-  const result = await tool.execute(args);
+  const resultado = await tool.execute(args);
 
   return {
-    content: [
-      {
-        type: 'text',
-        text: JSON.stringify(result, null, 2)
-      }
-    ]
+    content: [{ type: 'text', text: JSON.stringify(resultado, null, 2) }]
   };
 }
 
-function handleNotificationsInitialized(params) {
-  console.log('[MCP] notifications/initialized', params);
+function handleNotificationsInitialized() {
   return null;
 }
