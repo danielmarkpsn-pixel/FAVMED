@@ -1,13 +1,29 @@
 # FAVMED local HTTP server - Windows PowerShell 5.1+
 $ErrorActionPreference = "Stop"
 $Port = 8080
+$PortCandidates = @(8080, 8081, 8082, 8090, 8765)
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $DataFile = Join-Path $Root "fila.json"
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 if (-not (Test-Path $DataFile)) { [System.IO.File]::WriteAllText($DataFile, "[]", $Utf8NoBom) }
-$listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Any, $Port)
+$listener = $null
+foreach ($candidatePort in $PortCandidates) {
+  $candidate = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Any, $candidatePort)
+  try {
+    $candidate.Start()
+    $listener = $candidate
+    $Port = $candidatePort
+    break
+  } catch [System.Net.Sockets.SocketException] {
+    $candidate.Stop()
+  }
+}
+if ($null -eq $listener) {
+  Write-Host "ERRO: nenhuma das portas 8080, 8081, 8082, 8090 ou 8765 está disponível." -ForegroundColor Red
+  Write-Host "Feche outra instância do FAVMED ou o programa que estiver usando essas portas e tente novamente."
+  exit 1
+}
 try {
-  $listener.Start()
   Write-Host ""
   Write-Host "===============================================" -ForegroundColor Cyan
   Write-Host " FAVMED - Servidor da rede local" -ForegroundColor Cyan
