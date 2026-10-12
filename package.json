@@ -1,0 +1,30 @@
+{
+  "name": "mcp_quarks",
+  "version": "2.0.0",
+  "description": "MCP Server para integração completa com API Quarks - Agendamentos, Agendas, Convênios e Profissionais",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "mcp": "node index.js"
+  },
+  "keywords": [
+    "mcp",
+    "quarks",
+    "agendamentos",
+    "clinic",
+    "healthcare",
+    "model-context-protocol",
+    "api",
+    "rest"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^4.22.1",
+    "node-fetch": "^3.3.2"
+  }
+}
