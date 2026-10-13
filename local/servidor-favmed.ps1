@@ -1,7 +1,7 @@
 # FAVMED local HTTP server - Windows PowerShell 5.1+
 $ErrorActionPreference = "Stop"
-$Port = 8080
-$PortCandidates = @(8080, 8081, 8082, 8090, 8765)
+$Port = 2222
+$PortCandidates = @(2222)
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $DataFile = Join-Path $Root "fila.json"
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
@@ -19,8 +19,8 @@ foreach ($candidatePort in $PortCandidates) {
   }
 }
 if ($null -eq $listener) {
-  Write-Host "ERRO: nenhuma das portas 8080, 8081, 8082, 8090 ou 8765 está disponível." -ForegroundColor Red
-  Write-Host "Feche outra instância do FAVMED ou o programa que estiver usando essas portas e tente novamente."
+  Write-Host "ERRO: a porta fixa 2222 não está disponível." -ForegroundColor Red
+  Write-Host "Feche outra instância do FAVMED ou libere a porta 2222 e tente novamente."
   exit 1
 }
 try {
