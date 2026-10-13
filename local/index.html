@@ -92,11 +92,11 @@ function render(){
 }
 function renderPublic(){
  const today=patients.filter(p=>p.day===todayKey);
- const called=today.map(p=>({p,active:activeState(p)})).filter(x=>x.active).sort((a,b)=>(b.active.state.updatedAt||0)-(a.active.state.updatedAt||0));
+ const called=today.map(p=>({p,active:activeState(p)})).filter(x=>x.active).sort((a,b)=>(Number(b.active.state.status==="Chamado")-Number(a.active.state.status==="Chamado"))||((b.active.state.updatedAt||0)-(a.active.state.updatedAt||0)));
  const box=$("calledDisplay");if(!box)return;
  box.innerHTML=called.length?'<article class="called-card"><div class="call-label">PACIENTE CHAMADO</div><div class="call-name">'+esc(String(called[0].p.name||"").toLocaleUpperCase("pt-BR"))+'</div><div class="call-room">➜ '+esc(called[0].active.state.callLabel||called[0].active.service)+'</div></article>':'<div class="no-calls"><strong>Aguardando próxima chamada</strong>Por favor, aguarde. Seu nome será anunciado aqui.</div>';
  const q=$("publicQueueList");if(q){const waiting=today.filter(p=>p.status!=="Atendido"&&!activeState(p)).sort((a,b)=>(Number(!!b.priority)-Number(!!a.priority))||(a.created||0)-(b.created||0)).slice(0,8);q.innerHTML=waiting.length?waiting.map((p,i)=>'<div class="queue-person"><strong>'+esc(String(p.name||"").toLocaleUpperCase("pt-BR"))+'</strong><span>Posição '+(i+1)+' · '+esc(servicesText(p))+'</span></div>').join(""):'<div class="queue-person"><span>Não há outros pacientes aguardando.</span></div>';}
- if(publicVoiceEnabled&&called.length){const item=called[0],p=item.p,key=String(p.id)+"-"+String(item.active.state.updatedAt||p.created)+"-"+item.active.service;if(key!==lastPublicAnnouncementKey){lastPublicAnnouncementKey=key;announce({name:p.name,room:item.active.state.callLabel||item.active.service});}}
+ if(publicVoiceEnabled&&called.length&&called[0].active.state.status==="Chamado"){const item=called[0],p=item.p,key=String(p.id)+"-"+String(item.active.state.updatedAt||p.created)+"-"+item.active.service;if(key!==lastPublicAnnouncementKey){lastPublicAnnouncementKey=key;announce({name:p.name,room:item.active.state.callLabel||item.active.service});}}
 }
 function voiceLooksFeminine(v){return /female|feminina|maria|francisca|luciana|camila|helena|samantha|joana|vitoria|vit[oó]ria|sofia|sophia|fernanda|bruna|leticia|letícia|raquel|manuela/i.test(v.name||"");}
 function choosePortugueseFemaleVoice(){
