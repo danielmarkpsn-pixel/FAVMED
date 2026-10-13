@@ -90,37 +90,49 @@ function renderPublic(){
  box.innerHTML=called.length?called.map(p=>'<article class="called-card"><div class="call-label">PACIENTE CHAMADO</div><div class="call-name">'+esc(p.name)+'</div><div class="call-room">➜ '+esc(p.room)+'</div></article>').join(""):'<div class="no-calls"><strong>Aguardando próxima chamada</strong>Por favor, aguarde. Seu nome será anunciado aqui.</div>';
  if(publicVoiceEnabled&&called.length){const p=called[0],key=String(p.id)+"-"+String(p.calledAt||p.created);if(key!==lastPublicAnnouncementKey){lastPublicAnnouncementKey=key;announce(p);}}
 }
-function announce(p){const text="Paciente "+p.name+". Por favor, compareça ao "+p.room+".";
- lastAnnouncement=text;
- if(!("speechSynthesis" in window)||!("SpeechSynthesisUtterance" in window)){notify("Este navegador não oferece leitura de voz. Use Edge ou Chrome atualizado.");return;}
- window.speechSynthesis.cancel();
- const utter=new SpeechSynthesisUtterance(text);utter.lang="pt-BR";utter.rate=.88;utter.pitch=1.05;utter.volume=1;
- const selected=$("voiceSelect").value;
- let voice=voices.find(v=>v.name===selected);
- if(!voice){const pt=voices.filter(v=>/^pt(-|_)?br/i.test(v.lang)||/^pt/i.test(v.lang));voice=pt.find(v=>/female|feminina|maria|francisca|luciana|camila|female|helena|brasil/i.test(v.name))||pt[0]||voices.find(v=>/female|feminina|maria|luciana|camila|helena/i.test(v.name));}
- if(voice){utter.voice=voice;utter.lang=voice.lang||"pt-BR";}
- utter.onstart=()=>{$("voiceStatus").textContent="Reproduzindo chamada…";const s=$("publicVoiceStatus");if(s&&publicMode)s.textContent="Reproduzindo chamada por voz…";};
- utter.onend=()=>{$("voiceStatus").textContent=voice?"Voz selecionada: "+voice.name:"Voz padrão do navegador. Se não soar feminina, escolha outra voz disponível.";const s=$("publicVoiceStatus");if(s&&publicMode)s.textContent="Voz ativada. Anúncios automáticos habilitados nesta tela.";};
- utter.onerror=()=>{$("voiceStatus").textContent="Não foi possível reproduzir a voz. Verifique o áudio do computador.";const s=$("publicVoiceStatus");if(s&&publicMode)s.textContent="Falha no áudio. Verifique volume e saída de som deste dispositivo.";};
- window.speechSynthesis.speak(utter);
+function voiceLooksFeminine(v){return /female|feminina|maria|francisca|luciana|camila|helena|samantha|joana|vitoria|vit[oó]ria|sofia|sophia|fernanda|bruna|leticia|letícia|raquel|manuela/i.test(v.name||"");}
+function choosePortugueseFemaleVoice(){
+ const selected=$("voiceSelect")&&$("voiceSelect").value;
+ if(selected&&selected!=="auto"){const exact=voices.find(v=>v.name===selected);if(exact)return exact;}
+ const pt=voices.filter(v=>/^pt([_-]|$)/i.test(v.lang||""));
+ const ptBR=pt.filter(v=>/^pt[-_]BR$/i.test(v.lang||""));
+ const pool=ptBR.length?ptBR:pt;
+ return pool.find(voiceLooksFeminine)||pool.find(v=>/google.*portugu[eê]s.*brasil|francisca|microsoft.*(female|feminina)/i.test(v.name||""))||pool[0]||voices.find(voiceLooksFeminine)||null;
+}
+function speakFavmed(text,repeat=false){
+ if(!("speechSynthesis" in window)||!("SpeechSynthesisUtterance" in window)){notify("Este navegador não oferece leitura de voz. Use Chrome atualizado.");return false;}
+ const synth=window.speechSynthesis;synth.cancel();
+ const utter=new SpeechSynthesisUtterance(String(text||""));
+ const voice=choosePortugueseFemaleVoice();
+ utter.lang=(voice&&voice.lang)||"pt-BR";utter.rate=repeat ? 0.88 : 0.90;utter.pitch=1.03;utter.volume=1;
+ if(voice)utter.voice=voice;
+ utter.onstart=()=>{$("voiceStatus").textContent="Reproduzindo com "+(voice?voice.name:"a voz padrão do Chrome")+"…";const s=$("publicVoiceStatus");if(s&&publicMode)s.textContent="Anunciando chamada por voz…";};
+ utter.onend=()=>{$("voiceStatus").textContent=voice?"Voz selecionada: "+voice.name+".":"Voz padrão do Chrome. Instale uma voz pt-BR no Windows para tentar melhorar a naturalidade.";const s=$("publicVoiceStatus");if(s&&publicMode)s.textContent="Chamada anunciada. Aguardando próxima chamada.";};
+ utter.onerror=()=>{$("voiceStatus").textContent="Não foi possível reproduzir a voz. Verifique o volume e as vozes disponíveis.";const s=$("publicVoiceStatus");if(s&&publicMode)s.textContent="Falha no áudio. Verifique o volume e as vozes disponíveis.";};
+ synth.speak(utter);return true;
+}
+function announce(p){
+ const name=String(p.name||"").trim(),room=String(p.room||"").trim();
+ const text="Atenção. Paciente, "+name+". Por favor, dirija-se ao "+room+".";
+ lastAnnouncement=text;speakFavmed(text);
 }
 function fillVoices(){
  if(!("speechSynthesis" in window)){$("voiceStatus").textContent="Leitura de voz não suportada neste navegador.";return;}
- voices=window.speechSynthesis.getVoices()||[];
- const select=$("voiceSelect"),old=select.value;
- select.innerHTML='<option value="auto">Escolher voz feminina em português</option>';
- const pt=voices.filter(v=>/^pt/i.test(v.lang));
- const female=pt.filter(v=>/female|feminina|maria|francisca|luciana|camila|helena|brasil/i.test(v.name));
- const ordered=[...female,...pt.filter(v=>!female.includes(v))];
- ordered.forEach(v=>{const o=document.createElement("option");o.value=v.name;o.textContent=v.name+" ("+v.lang+")";select.appendChild(o);});
- if(ordered.some(v=>v.name===old))select.value=old;
- $("voiceStatus").textContent=pt.length?"Vozes em português detectadas: "+pt.length+". A identificação de voz feminina depende do nome informado pelo sistema.":"Nenhuma voz em português detectada; será usada a voz padrão disponível.";
+ const old=$("voiceSelect").value;voices=window.speechSynthesis.getVoices()||[];
+ const select=$("voiceSelect");select.innerHTML='<option value="auto">Automática — melhor voz em português disponível</option>';
+ const pt=voices.filter(v=>/^pt([_-]|$)/i.test(v.lang||""));
+ const ordered=[...pt.filter(v=>/^pt[-_]BR$/i.test(v.lang||"")&&voiceLooksFeminine(v)),...pt.filter(v=>/^pt[-_]BR$/i.test(v.lang||"")&&!voiceLooksFeminine(v)),...pt.filter(v=>!/^pt[-_]BR$/i.test(v.lang||"")&&voiceLooksFeminine(v)),...pt.filter(v=>!/^pt[-_]BR$/i.test(v.lang||"")&&!voiceLooksFeminine(v))];
+ const seen=new Set();ordered.forEach(v=>{if(seen.has(v.name))return;seen.add(v.name);const o=document.createElement("option");o.value=v.name;o.textContent=v.name+" ("+v.lang+")";select.appendChild(o);});
+ if(ordered.some(v=>v.name===old))select.value=old;else select.value="auto";
+ const preferred=choosePortugueseFemaleVoice();
+ $("voiceStatus").textContent=preferred?"Voz automática selecionada: "+preferred.name+". A naturalidade depende das vozes instaladas no Chrome/Windows.":"Nenhuma voz em português detectada. Verifique as vozes de fala do Windows.";
 }
+$("voiceSelect").addEventListener("change",()=>{const voice=choosePortugueseFemaleVoice();$("voiceStatus").textContent=voice?"Voz escolhida: "+voice.name+". Clique em “Testar voz” para ouvir.":"Nenhuma voz compatível encontrada.";});
 $("patientForm").addEventListener("submit",e=>{e.preventDefault();const name=$("patientName").value.trim(),room=$("room").value.trim();if(!name||!room){notify("Informe o nome e o consultório.");return;}const now=new Date();patients.push({id:String(Date.now())+Math.random().toString(16).slice(2,6),name,room,service:$("service").value,status:"Aguardando",day:todayKey,created:Date.now(),time:now.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})});save();render();$("patientName").value="";$("patientName").focus();notify("Paciente adicionado à fila.");});
 $("patientList").addEventListener("click",e=>{const b=e.target.closest("button[data-action]");if(!b)return;const p=patients.find(x=>x.id===b.dataset.id);if(!p)return;switch(b.dataset.action){case"call":p.status="Chamado";p.calledAt=Date.now();save();render();announce(p);break;case"attend":p.status="Atendido";p.attendedAt=Date.now();save();render();break;case"restore":p.status="Aguardando";save();render();break;case"remove":if(confirm("Remover "+p.name+" da fila?")){patients=patients.filter(x=>x.id!==p.id);save();render();}}});
 $("callNext").addEventListener("click",()=>{const p=patients.filter(x=>x.day===todayKey&&x.status==="Aguardando").sort((a,b)=>a.created-b.created)[0];if(!p){notify("Não há pacientes aguardando.");return;}p.status="Chamado";p.calledAt=Date.now();save();render();announce(p);});
-$("repeatLast").addEventListener("click",()=>{if(!lastAnnouncement){notify("Ainda não houve chamada nesta sessão.");return;}if(!("speechSynthesis"in window)){notify("Leitura de voz indisponível neste navegador.");return;}window.speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(lastAnnouncement);u.lang="pt-BR";u.rate=.88;u.pitch=1.05;const v=voices.find(x=>x.name===$("voiceSelect").value)||voices.find(x=>/^pt/i.test(x.lang));if(v){u.voice=v;u.lang=v.lang;}window.speechSynthesis.speak(u);});
-$("testVoice").addEventListener("click",()=>{lastAnnouncement="Teste de voz. Chamador de pacientes FAVMED. Por favor, compareça ao consultório.";if(!("speechSynthesis"in window)){notify("Leitura de voz indisponível neste navegador.");return;}const u=new SpeechSynthesisUtterance(lastAnnouncement);u.lang="pt-BR";u.rate=.88;u.pitch=1.05;const v=voices.find(x=>x.name===$("voiceSelect").value)||voices.find(x=>/^pt/i.test(x.lang));if(v){u.voice=v;u.lang=v.lang;}window.speechSynthesis.cancel();window.speechSynthesis.speak(u);});
+$("repeatLast").addEventListener("click",()=>{if(!lastAnnouncement){notify("Ainda não houve chamada nesta sessão.");return;}speakFavmed(lastAnnouncement,true);});
+$("testVoice").addEventListener("click",()=>{lastAnnouncement="Atenção. Teste de voz do FAVMED. Paciente, Maria da Silva. Por favor, dirija-se ao consultório número três.";speakFavmed(lastAnnouncement,true);});
 $("clearAttended").addEventListener("click",()=>{const n=patients.filter(p=>p.day===todayKey&&p.status==="Atendido").length;if(!n){notify("Não há atendidos para limpar.");return;}if(confirm("Remover "+n+" paciente(s) atendido(s) da lista de hoje?")){patients=patients.filter(p=>!(p.day===todayKey&&p.status==="Atendido"));save();render();}});
 $("exportCsv").addEventListener("click",()=>{const rows=[["Nome","Consultório","Atendimento","Status","Data","Hora de chegada"],...patients.filter(p=>p.day===todayKey).map(p=>[p.name,p.room,p.service,p.status,p.day,p.time])];const csv="\ufeff"+rows.map(r=>r.map(v=>'"'+String(v??"").replace(/"/g,'""')+'"').join(";")).join("\r\n");const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="favmed-fila-"+todayKey+".csv";a.click();URL.revokeObjectURL(url);});
 $("search").addEventListener("input",render);
