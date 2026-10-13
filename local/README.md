@@ -1,35 +1,42 @@
 # FAVMED Local — Chamador de pacientes para Windows
 
-Aplicativo local para a recepção, com tela de sala de espera acessível por outro computador ou dispositivo na mesma rede Wi-Fi/Ethernet. Não exige Node.js nem instalar programas adicionais; usa o PowerShell que acompanha o Windows.
+Aplicativo local da Clínica Favmed para recepção, sala de espera e profissionais. Compartilha a fila entre dispositivos da mesma rede local, usando o PowerShell incluído no Windows; não exige Node.js nem instalar programas adicionais.
 
-## Arquivos
-- `index.html`: interface do chamador.
-- `logo-favmed.png`: logotipo.
-- `servidor-favmed.ps1`: servidor local e armazenamento compartilhado da fila.
-- `INSTRUCOES-REDE-LOCAL.txt`: passo a passo de configuração, firewall e acesso à tela pública.
-- `ABRIR-FAVMED.bat`: abre a versão simples por arquivo, para uso em um computador.
-- `INICIAR-SERVIDOR-FAVMED.bat`: inicia o modo de rede local.
+## Arquivos principais
+- `index.html`: recepção e painel público da sala de espera.
+- `consultorio.html`: painel do profissional para chamar, iniciar e liberar cada serviço.
+- `logo-favmed.png`: logotipo da clínica.
+- `servidor-favmed.ps1`: servidor local e armazenamento compartilhado.
+- `fila.json`: dados operacionais locais (criado ao iniciar o servidor).
+- `INICIAR-SERVIDOR-FAVMED.bat`: inicia o servidor.
+- `INSTRUCOES-REDE-LOCAL.txt`: instruções completas de configuração e uso.
 
 ## Início rápido
-1. Baixe o ZIP do branch `favmed-local-chamador-windows` e extraia tudo para uma pasta permanente no computador da recepção.
-2. Leia `INSTRUCOES-REDE-LOCAL.txt` antes do primeiro uso em rede.
-3. Dê dois cliques em `INICIAR-SERVIDOR-FAVMED.bat` no computador da recepção. Se o Firewall do Windows perguntar, permita acesso **somente em redes privadas**.
-4. No outro computador, tablet ou TV com navegador, abra o endereço IP informado pelo servidor, acrescentando `/?painel=1`. Exemplo: `http://192.168.1.25:8080/?painel=1`.
-5. Na recepção, acesse o endereço-base informado pelo servidor (sem `?painel=1`) para cadastrar e chamar pacientes.
+1. Baixe o ZIP da branch `favmed-local-chamador-windows` e extraia em uma pasta permanente.
+2. Execute `INICIAR-SERVIDOR-FAVMED.bat) no computador principal.
+3. Use os links exibidos na janela do servidor:
+   - Recepção: `http://IP:PORTA/`
+   - Sala de espera: `http://IP:PORTA/?painel=1`
+   - Profissional: `http://IP:PORTA/consultorio`
+4. Para acesso remoto, os dispositivos devem estar na mesma rede local. Mantenha o servidor aberto.
 
-## Aparência e recursos
-- Interface clara, com branco, cinza-claro e azul-petróleo.
-- Cadastro manual, chamada por voz, repetição, busca, status, remoção e exportação CSV.
-- Tela pública em letras grandes, com nome do paciente chamado e consultório, atualizada pela rede local.
-- Dados da fila compartilhados por um arquivo JSON no computador da recepção.
+## Recursos incorporados do fluxo MARKYS
+- Cadastro com múltiplos serviços por paciente e consultório opcional.
+- Nome do paciente em letras maiúsculas, edição de nome e serviços, prioridade e busca.
+- Painel profissional separado: “Chamar na sala”, “Atender”, “Cancelar chamado” e “Liberar”.
+- Status por serviço; o paciente só é concluído quando todos os serviços forem liberados.
+- Horário de saída, retenção de atendidos na recepção e opção para reabrir.
+- Tela pública com chamada atual e próximos pacientes, sem mostrar atendimentos concluídos.
+- Anúncio por voz com seleção automática/manual de voz disponível, teste e repetição.
+- Exportação CSV, relatório PDF A4 vertical e backup JSON.
+- Atualização automática entre recepção, painel profissional e sala de espera.
+- Mantém a identidade visual da Favmed (branco, cinza-claro e azul-petróleo).
 
 ## Segurança e limitações
-- O computador da recepção deve permanecer ligado, com o servidor PowerShell aberto, para a tela de rede funcionar.
-- O IP pode mudar quando o roteador reinicia. Se o endereço parar de funcionar, feche e reabra o servidor e use o IP exibido.
-- O firewall deve liberar a porta TCP mostrada pelo servidor (normalmente 8080; pode usar 8081, 8082, 8090 ou 8765 se a porta principal estiver ocupada), apenas na rede privada/confiável. Não crie regra para rede pública e não encaminhe a porta no roteador para a internet.
-- Qualquer dispositivo com acesso a esse endereço na rede pode ver os nomes chamados. Use somente uma rede interna confiável e mostre apenas os dados mínimos necessários; não insira diagnóstico, CPF ou informações clínicas.
-- A fila fica no arquivo `local\fila.json` quando o servidor é iniciado. Faça cópias de segurança manualmente e restrinja o acesso à pasta.
-- A versão de rede não é criptografada e não possui login. Não use em Wi-Fi de visitantes nem exponha à internet.
-- A versão aberta diretamente como arquivo continua disponível, mas nesse modo a tela secundária funciona apenas no mesmo navegador/computador.
+- O computador principal precisa ficar ligado com o servidor PowerShell aberto.
+- A versão de rede usa HTTP local, sem login nem criptografia. Use somente rede interna confiável; não use Wi-Fi de visitantes nem exponha a porta à internet.
+- A tela pública exibe nomes e atendimentos. Não inclua diagnósticos, CPF ou informações clínicas.
+- O arquivo `local\\fila.json` contém registros operacionais; proteja a pasta e faça backups.
+- A voz depende das vozes disponibilizadas pelo Chrome/Windows; voz feminina neural não é garantida.
 
 Crédito: Desenvolvido por Daniel Marques via IA.
