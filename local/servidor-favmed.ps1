@@ -108,7 +108,7 @@ try {
         $jsonItems = ConvertTo-Json -InputObject @($items) -Compress -Depth 4
         $responseBytes = [System.Text.Encoding]::UTF8.GetBytes($jsonItems); $type = "application/json; charset=utf-8"
       } elseif ($path -eq "/api/slideshow/upload" -and $method -eq "POST") {
-        if ($contentLength -gt 52428800 -or $read -ne $contentLength) { $status = "413 Payload Too Large"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"error":"Arquivo maior que 50 MB"}'); $type = "application/json; charset=utf-8" }
+        if ($contentLength -gt 209715200 -or $read -ne $contentLength) { $status = "413 Payload Too Large"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"error":"Arquivo maior que 200 MB"}'); $type = "application/json; charset=utf-8" }
         else {
           try {
             $query = ""
@@ -122,7 +122,7 @@ try {
             $destination = Join-Path $SlideshowDir $safeName
             [System.IO.File]::WriteAllBytes($destination, $bodyBytes)
             $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"ok":true}'); $type = "application/json; charset=utf-8"
-          } catch { $status = "400 Bad Request"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"error":"Arquivo inválido. Use JPG, PNG, GIF, WEBP, BMP, MP4, WEBM, OGG, MOV ou M4V."}'); $type = "application/json; charset=utf-8" }
+          } catch { $status = "400 Bad Request"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"error":"Arquivo inválido. Use JPG, PNG, GIF, WEBP, BMP, MP4, WEBM, OGG, MOV ou M4V; máximo 200 MB."}'); $type = "application/json; charset=utf-8" }
         }
       } elseif ($path.StartsWith("/slideshow/")) {
         try {
