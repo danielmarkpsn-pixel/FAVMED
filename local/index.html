@@ -94,8 +94,32 @@ function render(){
  $("patientList").innerHTML=visible.length?visible.map((p,i)=>{const active=activeState(p);return '<article class="patient '+(active?(active.state.status==="Atendendo"?"attending":"called"):p.status==="Atendido"?"attended":"")+(p.priority?" priority":"")+'"><div class="number">'+(i+1)+'</div><div><div class="pname">'+esc(String(p.name||"").toLocaleUpperCase("pt-BR"))+(p.priority?'<span class="priority-flag">PRIORIDADE</span>':"")+'</div><div class="meta">Posição '+(i+1)+' · '+esc(servicesText(p))+' · '+esc(roomsText(p))+' · chegada '+esc(p.time||"—")+(p.exitTime?" · saída "+esc(p.exitTime):"")+'</div><div class="status '+(active?"called":p.status==="Atendido"?"attended":"waiting")+'">'+(active?esc(active.state.status+" · "+active.service):esc(p.status||"Aguardando"))+'</div></div><div class="pactions">'+(p.status==="Atendido"?'<button class="btn ghost" data-action="restore" data-id="'+esc(p.id)+'">Reabrir</button>':'<span class="status waiting">Ação pelo profissional</span>')+'<button class="btn ghost" data-action="edit" data-id="'+esc(p.id)+'">Editar nome</button><button class="btn ghost" data-action="editservices" data-id="'+esc(p.id)+'">Editar sala</button><button class="btn '+(p.priority?"warning":"ghost")+'" data-action="priority" data-id="'+esc(p.id)+'">★ Prioridade</button><button class="btn ghost" data-action="remove" data-id="'+esc(p.id)+'" aria-label="Remover paciente">✕</button></div></article>';}).join(""):'<div class="empty"><b>Nenhum paciente na fila</b>Adicione um paciente no formulário ao lado para começar.</div>';
  counts();
 }
-function mediaEmbedUrl(raw){let u;try{u=new URL(raw);}catch(e){return "";}if(u.protocol!=="http:"&&u.protocol!=="https:")return "";const host=u.hostname.toLowerCase().replace(/^www\./,"");if(host==="youtube.com"||host==="m.youtube.com"||host==="youtu.be"){let id="";if(host==="youtu.be")id=u.pathname.split("/").filter(Boolean)[0]||"";else if(u.pathname==="/watch")id=u.searchParams.get("v")||"";else if(/^\/(embed|shorts|live)\//.test(u.pathname))id=u.pathname.split("/")[2]||"";if(id)return "https://www.youtube.com/embed/"+encodeURIComponent(id)+"?autoplay=1&rel=0";}return u.href;}
-function loadMedia(raw){const container=$("mediaContainer"),url=mediaEmbedUrl(raw);if(!url){container.className="media-placeholder";container.textContent="Link inválido. Use um endereço http:// ou https://.";return;}container.className="";container.innerHTML="";const frame=document.createElement("iframe");frame.className="media-frame";frame.src=url;frame.title="Vídeo ou IPTV";frame.allow="autoplay; encrypted-media; picture-in-picture; fullscreen";frame.allowFullscreen=true;frame.referrerPolicy="strict-origin-when-cross-origin";container.appendChild(frame);try{localStorage.setItem("favmed_media_url",raw);}catch(e){}}
+function mediaEmbedUrl(raw){
+ let u;try{u=new URL(raw.trim().match(/^https?:\\/\\//i)?raw.trim():"https://"+raw.trim());}catch(e){return "";}
+ if(u.protocol!=="http:"&&u.protocol!=="https:")return "";
+ const host=u.hostname.toLowerCase().replace(/^www\\./,"");
+ if(["youtube.com","m.youtube.com","music.youtube.com","youtu.be","youtube-nocookie.com"].includes(host)){
+  let id="";
+  if(host==="youtu.be")id=u.pathname.split("/").filter(Boolean)[0]||"";
+  else if(u.pathname==="/watch")id=u.searchParams.get("v")||"";
+  else if(/^\\/(embed|shorts|live|v)\\//.test(u.pathname))id=u.pathname.split("/")[2]||"";
+  if(id&&/^[A-Za-z0-9_-]{6,}$/.test(id))return "https://www.youtube-nocookie.com/embed/"+encodeURIComponent(id)+"?autoplay=1&playsinline=1&rel=0";
+  if(u.pathname==="/playlist"&&u.searchParams.get("list"))return "https://www.youtube.com/embed/videoseries?list="+encodeURIComponent(u.searchParams.get("list"));
+  return "";
+ }
+ return u.href;
+}
+function loadMedia(raw){
+ const container=$("mediaContainer"),url=mediaEmbedUrl(raw);
+ if(!url){container.className="media-placeholder";container.textContent="Link não reconhecido. Cole o endereço completo de um vídeo do YouTube ou de um player web IPTV.";return;}
+ container.className="";container.innerHTML="";
+ const frame=document.createElement("iframe");frame.className="media-frame";frame.src=url;frame.title="Vídeo ou IPTV";frame.allow="autoplay; encrypted-media; picture-in-picture; fullscreen";frame.allowFullscreen=true;frame.referrerPolicy="strict-origin-when-cross-origin";frame.loading="eager";
+ container.appendChild(frame);
+ try{localStorage.setItem("favmed_media_url",raw);}catch(e){}
+ const fallback=document.createElement("div");fallback.className="media-help";fallback.style.marginTop="8px";
+ const link=document.createElement("a");link.href=raw.trim().match(/^https?:\\/\\//i)?raw.trim():"https://"+raw.trim();link.target="_blank";link.rel="noopener noreferrer";link.textContent="Se o vídeo não carregar, clique aqui para abrir em nova aba";link.style.color="#b9dcff";link.style.fontWeight="700";
+ fallback.appendChild(link);container.appendChild(fallback);
+}
 const mediaForm=$("mediaForm");if(mediaForm)mediaForm.addEventListener("submit",e=>{e.preventDefault();loadMedia($("mediaUrl").value.trim());});
 if(publicMode){try{const savedMedia=localStorage.getItem("favmed_media_url");if(savedMedia){$("mediaUrl").value=savedMedia;loadMedia(savedMedia);}}catch(e){}}
 function renderPublic(){
