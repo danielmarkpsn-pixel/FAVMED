@@ -27,16 +27,22 @@ main{max-width:1400px;margin:auto;padding:26px clamp(14px,3vw,32px) 40px}.hero{d
 .public-mode .public-screen .browser-controls,
 .public-mode .public-screen .browser-actions,
 .public-mode .public-screen .media-help{display:none!important}
-.public-mode .public-split{display:grid!important;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:10px;align-items:stretch;width:100%;max-width:none;height:calc(100vh - 26px);margin:0;padding:0}
-.public-mode .public-split .media-panel{display:flex!important;flex-direction:column;min-width:0;min-height:0;height:100%;padding:0;border:0;border-radius:0;background:#000}
+.public-mode .public-split{display:grid!important;grid-template-columns:minmax(0,0.9fr) minmax(0,1.1fr);gap:8px;align-items:stretch;width:calc(100% - 20px);max-width:none;height:calc(100vh - 20px);margin:10px;padding:0}
+.public-mode .public-split .call-board{min-width:0;overflow:auto;padding:8px}
+.public-mode .public-split .media-panel{display:flex!important;flex-direction:column;min-width:0;min-height:0;height:100%;padding:0;border:0;border-radius:8px;background:#000;overflow:hidden}
 .public-mode .public-split .media-frame,
 .public-mode .public-split .browser-frame,
 .public-mode .public-split #youtubePlayer{display:block;flex:1 1 auto;width:100%;height:100%;min-height:0;border:0;border-radius:0;background:#000}
 .public-mode .public-split #youtubePlayer[style*="display:none"]{display:none!important}
 .public-mode .public-split .media-placeholder{min-height:0;height:100%;border:0;border-radius:0}
-.public-mode .public-split .called-display{align-content:start}
-@media(max-width:950px){.public-mode .public-split{grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:6px}}
-@media(max-width:650px){.public-mode .public-split{grid-template-columns:minmax(0,1fr) minmax(0,1fr);height:100vh;gap:4px}.public-mode .public-split .media-panel{min-height:0;height:100%}.public-mode .public-split .called-display{grid-template-columns:1fr}.public-mode .public-split .media-frame,.public-mode .public-split .browser-frame{min-height:0}}
+.public-mode .public-split .called-display{align-content:start;grid-template-columns:1fr;gap:8px}
+.public-mode .public-split .called-card{padding:10px;border-radius:10px;box-shadow:none}
+.public-mode .public-split .called-card .call-label{font-size:clamp(10px,1vw,13px);letter-spacing:1px}
+.public-mode .public-split .called-card .call-name{font-size:clamp(16px,1.8vw,28px);margin:5px 0}
+.public-mode .public-split .called-card .call-room{font-size:clamp(13px,1.3vw,20px)}
+.public-mode .public-screen .screen-footer{font-size:10px;margin-top:0}
+@media(max-width:950px){.public-mode .public-split{grid-template-columns:minmax(0,0.9fr) minmax(0,1.1fr);gap:5px;width:calc(100% - 12px);height:calc(100vh - 12px);margin:6px}.public-mode .public-split .call-board{padding:4px}}
+@media(max-width:650px){.public-mode .public-split{grid-template-columns:minmax(0,0.9fr) minmax(0,1.1fr);height:calc(100vh - 8px);width:calc(100% - 8px);margin:4px;gap:4px}.public-mode .public-split .media-panel{min-height:0;height:100%}.public-mode .public-split .called-display{grid-template-columns:1fr}.public-mode .public-split .media-frame,.public-mode .public-split .browser-frame{min-height:0}}
 </style>
 </head>
 <body>
