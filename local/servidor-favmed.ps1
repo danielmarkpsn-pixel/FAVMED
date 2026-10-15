@@ -4,8 +4,10 @@ $Port = 2222
 $PortCandidates = @(2222)
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $DataFile = Join-Path $Root "fila.json"
+$MediaFile = Join-Path $Root "midia.json"
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 if (-not (Test-Path $DataFile)) { [System.IO.File]::WriteAllText($DataFile, "[]", $Utf8NoBom) }
+if (-not (Test-Path $MediaFile)) { [System.IO.File]::WriteAllText($MediaFile, '{"url":""}', $Utf8NoBom) }
 $listener = $null
 foreach ($candidatePort in $PortCandidates) {
   $candidate = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Any, $candidatePort)
@@ -93,7 +95,22 @@ try {
         $read += $n
       }
       $status = "200 OK"; $type = "text/plain; charset=utf-8"; $responseBytes = [byte[]]@()
-      if ($path -eq "/api/state" -and $method -eq "GET") {
+      if ($path -eq "/api/media" -and $method -eq "GET") {
+        $responseBytes = [System.IO.File]::ReadAllBytes($MediaFile); $type = "application/json; charset=utf-8"
+      } elseif ($path -eq "/api/media" -and $method -eq "POST") {
+        if ($contentLength -gt 16384 -or $read -ne $contentLength) { $status = "413 Payload Too Large"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes("Payload too large") }
+        else {
+          try {
+            $media = ConvertFrom-Json -InputObject ([System.Text.Encoding]::UTF8.GetString($bodyBytes))
+            if ($null -eq $media -or $media -is [System.Array] -or $null -eq $media.url) { throw "Expected media URL" }
+            $mediaUrl = [string]$media.url
+            if ($mediaUrl.Length -gt 2048) { throw "URL too long" }
+            $savedMedia = @{ url = $mediaUrl } | ConvertTo-Json -Compress
+            [System.IO.File]::WriteAllText($MediaFile, $savedMedia, $Utf8NoBom)
+            $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"ok":true}'); $type = "application/json; charset=utf-8"
+          } catch { $status = "400 Bad Request"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"error":"invalid media"}'); $type = "application/json; charset=utf-8" }
+        }
+      } elseif ($path -eq "/api/state" -and $method -eq "GET") {
         $responseBytes = [System.IO.File]::ReadAllBytes($DataFile); $type = "application/json; charset=utf-8"
       } elseif ($path -eq "/api/state" -and $method -eq "POST") {
         if ($contentLength -gt 1048576 -or $read -ne $contentLength) { $status = "413 Payload Too Large"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes("Payload too large") }
