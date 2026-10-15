@@ -216,7 +216,7 @@ function showSlideshowItem(){
   video.muted=false;video.volume=1;video.play().catch(()=>{if(slideshowTimer)clearTimeout(slideshowTimer);slideshowTimer=setTimeout(nextSlideshowItem,15000);});
  }else{
   video.pause();video.removeAttribute("src");video.load();video.style.display="none";img.style.display="block";img.src=item.url;
-  slideshowTimer=setTimeout(nextSlideshowItem,10000);
+  slideshowTimer=setTimeout(nextSlideshowItem,20000);
  }
 }
 function nextSlideshowItem(){if(!slideshowItems.length)return;if(slideshowTimer){clearTimeout(slideshowTimer);slideshowTimer=null;}slideshowIndex=(slideshowIndex+1)%slideshowItems.length;showSlideshowItem();}
