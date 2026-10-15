@@ -65,7 +65,7 @@ main{max-width:1400px;margin:auto;padding:26px clamp(14px,3vw,32px) 40px}.hero{d
   </section>
  </div>
 </main>
-<div id="slideshowOverlay" aria-label="Apresentação de fotos e vídeos" style="display:none;position:fixed;inset:0;z-index:9999;background:#000;align-items:center;justify-content:center"><img id="slideshowImage" alt="" style="display:none;width:100%;height:100%;object-fit:contain"><video id="slideshowVideo" style="display:none;width:100%;height:100%;object-fit:contain" autoplay muted playsinline loop></video></div>
+<div id="slideshowOverlay" aria-label="Apresentação de fotos e vídeos" style="display:none;position:fixed;inset:0;z-index:9999;background:#000;align-items:center;justify-content:center"><img id="slideshowImage" alt="" style="display:none;width:100%;height:100%;object-fit:contain"><video id="slideshowVideo" style="display:none;width:100%;height:100%;object-fit:contain" autoplay muted playsinline></video></div>
 <div class="toast" id="toast" role="status"></div>
 <script>
 (function(){
@@ -196,24 +196,29 @@ function openBrowserAddress(raw,updateField=true){const frame=$("browserFrame"),
 
 async function refreshSlideshowItems(){
  if(!serverMode)return;
- try{const r=await fetch("/api/slideshow",{cache:"no-store"});if(!r.ok)return;const data=await r.json();const list=Array.isArray(data)?data:[];const old=slideshowItems.map(x=>x.name).join("|");const next=list.map(x=>({name:String(x.name||""),type:String(x.type||""),url:String(x.url||"")}));if(old!==next.map(x=>x.name).join("|")){slideshowItems=next;if(slideshowIndex>=slideshowItems.length)slideshowIndex=0;if(slideshowActive)showSlideshowItem();}const box=$("slideshowFileList");if(box)box.textContent=slideshowItems.length?"Arquivos disponíveis na sala: "+slideshowItems.map(x=>x.name).join(", "):"Nenhum arquivo enviado ainda."; }catch(e){}
+ try{const r=await fetch("/api/slideshow",{cache:"no-store"});if(!r.ok)return;const data=await r.json();const list=Array.isArray(data)?data:[];const old=slideshowItems.map(x=>x.name).join("|");const next=list.map(x=>({name:String(x.name||""),type:String(x.type||""),url:String(x.url||"")})).sort((a,b)=>{const isVideo=x=>/^video\//i.test(x.type)||/\.(mp4|webm|ogg|mov|m4v)(?:$|[?#])/i.test(x.name);return Number(isVideo(a))-Number(isVideo(b))||a.name.localeCompare(b.name,"pt-BR",{numeric:true,sensitivity:"base"});});if(old!==next.map(x=>x.name).join("|")){slideshowItems=next;if(slideshowIndex>=slideshowItems.length)slideshowIndex=0;if(slideshowActive)showSlideshowItem();}const box=$("slideshowFileList");if(box)box.textContent=slideshowItems.length?"Arquivos disponíveis na sala: "+slideshowItems.map(x=>x.name).join(", "):"Nenhum arquivo enviado ainda."; }catch(e){}
 }
 function hideSlideshow(){const overlay=$("slideshowOverlay"),video=$("slideshowVideo");if(!overlay)return;overlay.style.display="none";if(video)video.pause();const img=$("slideshowImage");if(img)img.removeAttribute("src");slideshowActive=false;if(slideshowTimer){clearTimeout(slideshowTimer);slideshowTimer=null;}}
 function showSlideshowItem(){
  if(!publicMode||!slideshowItems.length)return;
  const overlay=$("slideshowOverlay"),img=$("slideshowImage"),video=$("slideshowVideo");if(!overlay||!img||!video)return;
+ if(slideshowTimer){clearTimeout(slideshowTimer);slideshowTimer=null;}
  if(slideshowIndex>=slideshowItems.length)slideshowIndex=0;
  const item=slideshowItems[slideshowIndex];overlay.style.display="flex";slideshowActive=true;
- if(item.type==="video"){
+ const isVideo=/^video\//i.test(item.type)||/\.(mp4|webm|ogg|mov|m4v)(?:$|[?#])/i.test(item.name);
+ if(isVideo){
   img.style.display="none";img.removeAttribute("src");video.style.display="block";
   const itemUrl=new URL(item.url,location.href).href;
-  if(video.src!==itemUrl){video.src=item.url;video.currentTime=0;}
+  if(video.src!==itemUrl)video.src=itemUrl;
+  try{video.currentTime=0;}catch(e){}
   video.play().catch(()=>{if(slideshowTimer)clearTimeout(slideshowTimer);slideshowTimer=setTimeout(nextSlideshowItem,15000);});
+ }else{
+  video.pause();video.removeAttribute("src");video.load();video.style.display="none";img.style.display="block";img.src=item.url;
+  slideshowTimer=setTimeout(nextSlideshowItem,10000);
  }
- else{video.pause();video.style.display="none";img.style.display="block";img.src=item.url;if(slideshowTimer)clearTimeout(slideshowTimer);slideshowTimer=setTimeout(nextSlideshowItem,10000);}
 }
-function nextSlideshowItem(){if(!slideshowItems.length)return;slideshowIndex=(slideshowIndex+1)%slideshowItems.length;showSlideshowItem();}
-const slideVideo=$("slideshowVideo");if(slideVideo){slideVideo.loop=true;slideVideo.addEventListener("ended",()=>{try{slideVideo.currentTime=0;slideVideo.play();}catch(e){}});}
+function nextSlideshowItem(){if(!slideshowItems.length)return;if(slideshowTimer){clearTimeout(slideshowTimer);slideshowTimer=null;}slideshowIndex=(slideshowIndex+1)%slideshowItems.length;showSlideshowItem();}
+const slideVideo=$("slideshowVideo");if(slideVideo){slideVideo.loop=false;slideVideo.removeAttribute("loop");slideVideo.addEventListener("ended",nextSlideshowItem);}
 async function uploadSlideshowFiles(){
  const input=$("slideshowFiles"),status=$("slideshowStatus");if(!input||!input.files||!input.files.length){notify("Selecione uma ou mais fotos ou vídeos.");return;}
  if(!serverMode){notify("O upload exige abrir o FAVMED pelo servidor local.");return;}
