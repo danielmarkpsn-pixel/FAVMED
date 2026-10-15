@@ -1,0 +1,74 @@
+FAVMED — CONFIGURAÇÃO E ACESSO ÀS TELAS PELA REDE LOCAL
+Clínica Favmed · Medicina Ocupacional
+Desenvolvido por Daniel Marques via IA
+
+IMPORTANTE
+Esta versão compartilha a fila por HTTP dentro da rede local. Não tem login nem criptografia. Use somente uma rede interna confiável; não use Wi-Fi de visitantes e não encaminhe a porta para a internet. A tela pública exibe nomes e atendimentos; mantenha-a voltada à sala de espera e mostre apenas os dados mínimos necessários.
+
+1. BAIXAR E PREPARAR
+1. Abra o repositório FAVMED no GitHub e selecione a branch favmed-local-chamador-windows.
+2. Clique em Code > Download ZIP e extraia o ZIP para uma pasta permanente, por exemplo Documentos\FAVMED. Não execute dentro do ZIP.
+3. Na pasta local, confirme a presença de index.html, consultorio.html, logo-favmed.png, servidor-favmed.ps1 e INICIAR-SERVIDOR-FAVMED.bat.
+4. Quando houver uma versão nova, substitua os arquivos antigos pelos atualizados. Não substitua fila.json se quiser manter os registros locais.
+
+2. INICIAR O SERVIDOR
+1. No computador principal da recepção, execute INICIAR-SERVIDOR-FAVMED.bat.
+2. Se o Firewall do Windows perguntar, permita acesso somente em redes privadas confiáveis.
+3. Mantenha a janela do PowerShell aberta. O computador principal precisa permanecer ligado e sem suspensão.
+4. A janela mostra os endereços reais e a porta selecionada (normalmente 8080; se ocupada, tenta 8081, 8082, 8090 ou 8765).
+
+3. ENDEREÇOS DAS TELAS
+Use os endereços exibidos na janela do servidor e substitua o IP/porta pelos valores reais:
+- Recepção: http://127.0.0.1:8080/
+- Sala de espera: http://127.0.0.1:8080/?painel=1
+- Painel do profissional: http://127.0.0.1:8080/consultorio
+
+Para outros computadores, tablets ou TVs, use o IP da rede mostrado pelo servidor em vez de 127.0.0.1. Todos os dispositivos devem estar na mesma rede interna. O endereço 127.0.0.1 funciona apenas no próprio computador.
+
+4. CONFIGURAR O FIREWALL SE NECESSÁRIO
+1. Abra “Firewall do Windows Defender com Segurança Avançada”.
+2. Entre em “Regras de Entrada” > “Nova Regra...”.
+3. Selecione “Porta”, TCP e a porta que aparece na janela do FAVMED.
+4. Selecione “Permitir a conexão” e marque somente “Privado” (ou peça à TI para avaliar uma rede corporativa de domínio).
+5. Nomeie a regra “FAVMED - Servidor local TCP [porta]”.
+Não desative o firewall inteiro e não permita acesso em redes públicas. Se não tiver permissão administrativa, peça ajuda à TI.
+
+5. COMO USAR O SISTEMA
+1. Na recepção, cadastre o nome do paciente em letras maiúsculas.
+2. Selecione um ou mais tipos de atendimento, um consultório, ou ambos conforme o fluxo da clínica. É necessário selecionar pelo menos um tipo de atendimento ou consultório.
+3. A recepção pode editar o nome, editar os serviços, marcar prioridade, reabrir um registro atendido e remover registros.
+4. O profissional abre /consultorio, escolhe “Todos os atendimentos” ou um serviço/consultório, e usa “Chamar na sala”.
+5. O profissional clica em “Atender” quando iniciar e “Liberar” ao concluir cada serviço. Se houver vários serviços, o paciente só fica concluído quando todos forem liberados.
+6. O horário de saída e o status “Atendido” são registrados ao concluir todos os serviços. O registro permanece na recepção até ser removido; pode ser reaberto.
+7. A sala de espera mostra a chamada atual e os próximos pacientes, atualizando automaticamente. Os atendidos e os serviços já liberados não devem voltar à fila pública.
+
+6. ATIVAR A VOZ NA SALA DE ESPERA
+1. Abra o endereço /?painel=1 no dispositivo da sala de espera.
+2. Clique em “Ativar voz nesta tela” uma vez para permitir áudio no navegador.
+3. A chamada por voz acontece quando o profissional clicar em “Chamar na sala”.
+4. A recepção também tem “Testar voz” e “Repetir última” para verificar o som.
+5. A voz depende das vozes que o Chrome/Windows disponibiliza. Para melhorar a naturalidade, selecione uma voz em português do Brasil no campo de voz, se houver.
+6. Se não houver som, confira volume, saída de áudio e permissões do navegador. A Web Speech API não garante uma voz feminina neural em todos os computadores.
+
+7. RELATÓRIOS E CÓPIAS DE SEGURANÇA
+- “Exportar CSV” gera uma planilha compatível com Excel.
+- “Exportar PDF (A4 vertical)” abre a impressão para salvar/ imprimir o relatório.
+- “Backup JSON” baixa uma cópia dos registros. Guarde o backup em pasta restrita e protegida.
+- O arquivo fila.json fica na pasta local do servidor e contém dados operacionais. Não o envie ao GitHub nem compartilhe fora da clínica.
+
+8. SOLUÇÃO DE PROBLEMAS
+- Uma tela não abre: confirme que o servidor continua aberto, que os dispositivos estão na mesma rede e que usou o IP/porta corretos.
+- A tela não atualiza: atualize a página com Ctrl+R e confirme que o servidor está ativo.
+- A porta está ocupada: o FAVMED tenta portas alternativas e mostra a porta selecionada; use-a nos links e na regra do firewall.
+- A voz não fala: clique em “Ativar voz nesta tela”, confira o volume e teste a voz. Navegadores podem bloquear áudio até ocorrer um clique.
+- O profissional não consegue chamar: confirme que abriu /consultorio e que o paciente tem o serviço ou consultório selecionado no filtro.
+- O endereço IP mudou: reinicie o servidor e use os links exibidos na janela.
+
+9. PRIVACIDADE E ENCERRAMENTO
+- Não insira diagnósticos, CPF ou detalhes clínicos no chamador.
+- A rede não tem login nem criptografia; qualquer dispositivo autorizado na rede pode consultar a fila.
+- Não encaminhe a porta no roteador e não exponha o servidor à internet.
+- Para encerrar, volte à janela do PowerShell e pressione Ctrl+C.
+- Proteja a pasta do FAVMED e faça backups conforme a política da clínica.
+
+FIM

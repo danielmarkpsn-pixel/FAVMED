@@ -2,18 +2,13 @@ import express from 'express';
 
 export const healthRouter = express.Router();
 
+// Endpoint de disponibilidade: não revela tokens, chaves, versão do sistema ou ambiente.
 healthRouter.get('/', (req, res) => {
-  const healthStatus = {
-    status: 'healthy',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    environment: {
-      nodeVersion: process.version,
-      platform: process.platform,
-      apiConfigured: !!process.env.QUARKS_API_TOKEN,
-      keysConfigured: !!(process.env.QUARKS_CHAVE_KEY && process.env.QUARKS_SECRET_KEY)
-    }
-  };
-
-  res.json(healthStatus);
+  res.set('Cache-Control', 'no-store');
+  res.json({
+    servico: 'Clínica Favmed - Medicina Ocupacional',
+    status: 'disponivel',
+    horario: new Date().toISOString(),
+    tempoLigadoSegundos: Math.floor(process.uptime())
+  });
 });
