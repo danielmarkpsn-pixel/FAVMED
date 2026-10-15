@@ -105,7 +105,9 @@ try {
             if ($null -eq $media -or $media -is [System.Array] -or $null -eq $media.url) { throw "Expected media URL" }
             $mediaUrl = [string]$media.url
             if ($mediaUrl.Length -gt 2048) { throw "URL too long" }
-            $savedMedia = @{ url = $mediaUrl } | ConvertTo-Json -Compress
+            $fullscreenWhenIdle = $false
+            if ($null -ne $media.PSObject.Properties['fullscreenWhenIdle']) { $fullscreenWhenIdle = [bool]$media.fullscreenWhenIdle }
+            $savedMedia = @{ url = $mediaUrl; fullscreenWhenIdle = $fullscreenWhenIdle } | ConvertTo-Json -Compress
             [System.IO.File]::WriteAllText($MediaFile, $savedMedia, $Utf8NoBom)
             $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"ok":true}'); $type = "application/json; charset=utf-8"
           } catch { $status = "400 Bad Request"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"error":"invalid media"}'); $type = "application/json; charset=utf-8" }
