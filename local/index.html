@@ -32,8 +32,10 @@ main{max-width:1400px;margin:auto;padding:26px clamp(14px,3vw,32px) 40px}.hero{d
 .public-mode .public-split .media-panel{display:flex!important;flex-direction:column;min-width:0;min-height:0;height:100%;padding:0;border:0;border-radius:8px;background:#000;overflow:hidden}
 .public-mode .public-split .media-frame,
 .public-mode .public-split .browser-frame,
-.public-mode .public-split #youtubePlayer{display:block;flex:1 1 auto;width:100%;height:100%;min-height:0;border:0;border-radius:0;background:#000}
-.public-mode .public-split #youtubePlayer[style*="display:none"]{display:none!important}
+.public-mode .public-split #youtubePlayer{flex:1 1 auto;width:100%;height:100%;min-height:0;border:0;border-radius:0;background:#000}
+.public-mode .public-split .media-frame:not([style*="display:none"]),
+.public-mode .public-split .browser-frame:not([style*="display:none"]),
+.public-mode .public-split #youtubePlayer:not([style*="display:none"]){display:block}
 .public-mode .public-split .media-placeholder{min-height:0;height:100%;border:0;border-radius:0}
 .public-mode .public-split .called-display{align-content:start;grid-template-columns:1fr;gap:8px}
 .public-mode .public-split .called-card{padding:10px;border-radius:10px;box-shadow:none}
