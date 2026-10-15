@@ -5,6 +5,8 @@ $PortCandidates = @(2222)
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $DataFile = Join-Path $Root "fila.json"
 $MediaFile = Join-Path $Root "midia.json"
+$SlideshowDir = Join-Path $Root "midia-sala"
+if (-not (Test-Path $SlideshowDir)) { New-Item -ItemType Directory -Path $SlideshowDir | Out-Null }
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 if (-not (Test-Path $DataFile)) { [System.IO.File]::WriteAllText($DataFile, "[]", $Utf8NoBom) }
 if (-not (Test-Path $MediaFile)) { [System.IO.File]::WriteAllText($MediaFile, '{"url":""}', $Utf8NoBom) }
@@ -84,7 +86,8 @@ try {
       $request = $lines[0] -split " "
       if ($request.Count -lt 2) { continue }
       $method = $request[0].ToUpperInvariant()
-      $path = $request[1].Split('?')[0]
+      $requestTarget = $request[1]
+      $path = $requestTarget.Split('?')[0]
       $contentLength = 0
       foreach ($line in $lines) { if ($line -match "(?i)^Content-Length:\s*(\d+)") { $contentLength = [int]$Matches[1] } }
       $bodyBytes = New-Object byte[] $contentLength
@@ -95,7 +98,45 @@ try {
         $read += $n
       }
       $status = "200 OK"; $type = "text/plain; charset=utf-8"; $responseBytes = [byte[]]@()
-      if ($path -eq "/api/media" -and $method -eq "GET") {
+      if ($path -eq "/api/slideshow" -and $method -eq "GET") {
+        $items = @()
+        foreach ($file in (Get-ChildItem -LiteralPath $SlideshowDir -File | Sort-Object Name)) {
+          $ext = $file.Extension.ToLowerInvariant()
+          $kind = if ($ext -in @(".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp")) { "image" } else { "video" }
+          $items += @{ name = $file.Name; type = $kind; url = "/slideshow/" + [Uri]::EscapeDataString($file.Name) }
+        }
+        $jsonItems = ConvertTo-Json -InputObject @($items) -Compress -Depth 4
+        $responseBytes = [System.Text.Encoding]::UTF8.GetBytes($jsonItems); $type = "application/json; charset=utf-8"
+      } elseif ($path -eq "/api/slideshow/upload" -and $method -eq "POST") {
+        if ($contentLength -gt 52428800 -or $read -ne $contentLength) { $status = "413 Payload Too Large"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"error":"Arquivo maior que 50 MB"}'); $type = "application/json; charset=utf-8" }
+        else {
+          try {
+            $query = ""
+            if ($requestTarget.Contains("?")) { $query = $requestTarget.Substring($requestTarget.IndexOf("?") + 1) }
+            $rawName = ""
+            foreach ($part in ($query -split "&")) { if ($part -match "^name=(.*)$") { $rawName = [Uri]::UnescapeDataString($Matches[1].Replace("+", " ")) } }
+            $safeName = [System.IO.Path]::GetFileName($rawName)
+            $ext = [System.IO.Path]::GetExtension($safeName).ToLowerInvariant()
+            $allowed = @(".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".mp4", ".webm", ".ogg", ".mov", ".m4v")
+            if ([string]::IsNullOrWhiteSpace($safeName) -or $safeName.Length -gt 180 -or $ext -notin $allowed -or $contentLength -le 0) { throw "Nome, extensão ou tamanho inválido" }
+            $destination = Join-Path $SlideshowDir $safeName
+            [System.IO.File]::WriteAllBytes($destination, $bodyBytes)
+            $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"ok":true}'); $type = "application/json; charset=utf-8"
+          } catch { $status = "400 Bad Request"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"error":"Arquivo inválido. Use JPG, PNG, GIF, WEBP, BMP, MP4, WEBM, OGG, MOV ou M4V."}'); $type = "application/json; charset=utf-8" }
+        }
+      } elseif ($path.StartsWith("/slideshow/")) {
+        try {
+          $requestedName = [Uri]::UnescapeDataString($path.Substring("/slideshow/".Length))
+          $safeName = [System.IO.Path]::GetFileName($requestedName)
+          $filePath = Join-Path $SlideshowDir $safeName
+          if ([string]::IsNullOrWhiteSpace($safeName) -or -not (Test-Path -LiteralPath $filePath -PathType Leaf)) { throw "Not found" }
+          $ext = [System.IO.Path]::GetExtension($safeName).ToLowerInvariant()
+          $mime = @{ ".jpg"="image/jpeg"; ".jpeg"="image/jpeg"; ".png"="image/png"; ".gif"="image/gif"; ".webp"="image/webp"; ".bmp"="image/bmp"; ".mp4"="video/mp4"; ".webm"="video/webm"; ".ogg"="video/ogg"; ".mov"="video/quicktime"; ".m4v"="video/mp4" }
+          $type = $mime[$ext]
+          if (-not $type) { throw "Unsupported media type" }
+          $responseBytes = [System.IO.File]::ReadAllBytes($filePath)
+        } catch { $status = "404 Not Found"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes("Not found") }
+      } elseif ($path -eq "/api/media" -and $method -eq "GET") {
         $responseBytes = [System.IO.File]::ReadAllBytes($MediaFile); $type = "application/json; charset=utf-8"
       } elseif ($path -eq "/api/media" -and $method -eq "POST") {
         if ($contentLength -gt 16384 -or $read -ne $contentLength) { $status = "413 Payload Too Large"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes("Payload too large") }
