@@ -113,7 +113,12 @@ function mediaEmbedUrl(raw){
 function loadMedia(raw){
  const container=$("mediaContainer");if(!container)return;
  const url=mediaEmbedUrl(raw);
- if(!url){container.className="media-placeholder";container.textContent=raw?"Este link não pode ser incorporado. A recepção pode usar um link direto de vídeo/player web.":"Aguardando a recepção configurar o vídeo ou IPTV.";return;}
+ if(!url){
+  container.className="media-placeholder";container.innerHTML="";
+  const message=document.createElement("div");message.textContent=raw?"Este link não pode ser incorporado automaticamente. Use o link abaixo para abrir o conteúdo no YouTube ou no navegador.":"Aguardando a recepção configurar o vídeo ou IPTV.";container.appendChild(message);
+  if(raw){const link=document.createElement("a");link.href=raw.trim().match(/^https?:\/\//i)?raw.trim():"https://"+raw.trim();link.target="_blank";link.rel="noopener noreferrer";link.textContent="Abrir link em nova aba";link.style.display="inline-block";link.style.marginTop="12px";link.style.color="#b9dcff";link.style.fontWeight="700";container.appendChild(link);}
+  return;
+ }
  container.className="";container.innerHTML="";
  const frame=document.createElement("iframe");frame.className="media-frame";frame.src=url;frame.title="Vídeo ou IPTV";frame.allow="autoplay; encrypted-media; picture-in-picture; fullscreen";frame.allowFullscreen=true;frame.referrerPolicy="strict-origin-when-cross-origin";frame.loading="eager";
  container.appendChild(frame);
