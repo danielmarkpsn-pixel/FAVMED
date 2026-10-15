@@ -106,25 +106,71 @@ function mediaEmbedUrl(raw){
   else if(/^\/(embed|shorts|live|v)\//.test(u.pathname))id=u.pathname.split("/")[2]||"";
   if(id&&/^[A-Za-z0-9_-]{6,}$/.test(id))return "https://www.youtube-nocookie.com/embed/"+encodeURIComponent(id)+"?autoplay=1&playsinline=1&rel=0";
   if(u.pathname==="/playlist"&&u.searchParams.get("list"))return "https://www.youtube.com/embed/videoseries?list="+encodeURIComponent(u.searchParams.get("list"));
-  return "";
  }
- return u.href;
+ return "";
 }
-function loadMedia(raw){
+function addMediaFallback(container,raw,message){
+ const box=document.createElement("div");box.className="media-help";box.style.marginTop="8px";box.textContent=message;container.appendChild(box);
+ if(raw){const link=document.createElement("a");link.href=raw.trim().match(/^https?:\/\//i)?raw.trim():"https://"+raw.trim();link.target="_blank";link.rel="noopener noreferrer";link.textContent="Abrir link original em nova aba";link.style.display="inline-block";link.style.marginTop="8px";link.style.color="#b9dcff";link.style.fontWeight="700";container.appendChild(link);}
+}
+function isPlaylistUrl(url){return /\.m3u(?:$|[?#])/i.test(url);}
+function isHlsUrl(url){return /\.m3u8(?:$|[?#])/i.test(url);}
+function absolutePlaylistEntry(entry,base){try{return new URL(entry,base).href;}catch(e){return "";}}
+async function resolveM3uPlaylist(url){
+ const response=await fetch(url,{cache:"no-store"});
+ if(!response.ok)throw new Error("A lista respondeu HTTP "+response.status);
+ const text=await response.text();
+ const entries=text.split(/\r?\n/).map(line=>line.trim()).filter(line=>line&&!line.startsWith("#"));
+ if(!entries.length)throw new Error("A lista M3U não contém endereços de mídia reconhecíveis.");
+ const resolved=entries.map(entry=>absolutePlaylistEntry(entry,url)).filter(Boolean);
+ const hls=resolved.find(isHlsUrl);
+ if(hls)return hls;
+ const video=resolved.find(u=>/\.(mp4|webm|ogg)(?:$|[?#])/i.test(u));
+ if(video)return video;
+ throw new Error("A lista foi lida, mas não encontrei um endereço .m3u8, MP4, WebM ou OGG nela.");
+}
+function loadHlsScript(){
+ if(window.Hls)return Promise.resolve(window.Hls);
+ if(window.__favmedHlsPromise)return window.__favmedHlsPromise;
+ window.__favmedHlsPromise=new Promise((resolve,reject)=>{
+  const script=document.createElement("script");
+  script.src="https://cdn.jsdelivr.net/npm/hls.js@1.6.13/dist/hls.min.js";
+  script.onload=()=>window.Hls?resolve(window.Hls):reject(new Error("A biblioteca HLS não carregou."));
+  script.onerror=()=>reject(new Error("Não foi possível carregar o player HLS. Verifique a internet da sala de espera."));
+  document.head.appendChild(script);
+ });
+ return window.__favmedHlsPromise;
+}
+async function loadMedia(raw){
  const container=$("mediaContainer");if(!container)return;
- const url=mediaEmbedUrl(raw);
- if(!url){
-  container.className="media-placeholder";container.innerHTML="";
-  const message=document.createElement("div");message.textContent=raw?"Este link não pode ser incorporado automaticamente. Use o link abaixo para abrir o conteúdo no YouTube ou no navegador.":"Aguardando a recepção configurar o vídeo ou IPTV.";container.appendChild(message);
-  if(raw){const link=document.createElement("a");link.href=raw.trim().match(/^https?:\/\//i)?raw.trim():"https://"+raw.trim();link.target="_blank";link.rel="noopener noreferrer";link.textContent="Abrir link em nova aba";link.style.display="inline-block";link.style.marginTop="12px";link.style.color="#b9dcff";link.style.fontWeight="700";container.appendChild(link);}
-  return;
+ container.className="media-placeholder";container.innerHTML="";
+ if(!raw){container.textContent="Aguardando a recepção configurar o vídeo ou IPTV.";return;}
+ let source=raw.trim().match(/^https?:\/\//i)?raw.trim():"https://"+raw.trim();
+ let parsed;try{parsed=new URL(source);}catch(e){container.textContent="O endereço informado não é válido.";addMediaFallback(container,raw,"Confira o link informado.");return;}
+ if(parsed.protocol!=="http:"&&parsed.protocol!=="https:"){container.textContent="Use um link HTTP ou HTTPS.";return;}
+ const youtube=mediaEmbedUrl(source);
+ if(youtube){
+  container.className="";const frame=document.createElement("iframe");frame.className="media-frame";frame.src=youtube;frame.title="Vídeo do YouTube";frame.allow="autoplay; encrypted-media; picture-in-picture; fullscreen";frame.allowFullscreen=true;frame.referrerPolicy="strict-origin-when-cross-origin";frame.loading="eager";container.appendChild(frame);
+  addMediaFallback(container,source,"Se o YouTube bloquear a incorporação deste vídeo, abra o link original. Alguns vídeos não permitem reprodução em telas incorporadas.");return;
  }
- container.className="";container.innerHTML="";
- const frame=document.createElement("iframe");frame.className="media-frame";frame.src=url;frame.title="Vídeo ou IPTV";frame.allow="autoplay; encrypted-media; picture-in-picture; fullscreen";frame.allowFullscreen=true;frame.referrerPolicy="strict-origin-when-cross-origin";frame.loading="eager";
- container.appendChild(frame);
- const fallback=document.createElement("div");fallback.className="media-help";fallback.style.marginTop="8px";
- const link=document.createElement("a");link.href=raw.trim().match(/^https?:\/\//i)?raw.trim():"https://"+raw.trim();link.target="_blank";link.rel="noopener noreferrer";link.textContent="Se não reproduzir nesta tela, abrir o link em nova aba";link.style.color="#b9dcff";link.style.fontWeight="700";
- fallback.appendChild(link);container.appendChild(fallback);
+ try{
+  if(isPlaylistUrl(source)){container.textContent="Lendo a lista M3U…";source=await resolveM3uPlaylist(source);}
+  container.className="";container.innerHTML="";
+  const video=document.createElement("video");video.className="media-frame";video.controls=true;video.autoplay=true;video.playsInline=true;video.preload="auto";video.title="Vídeo / IPTV";video.style.objectFit="contain";container.appendChild(video);
+  if(isHlsUrl(source)){
+   if(video.canPlayType("application/vnd.apple.mpegurl")){video.src=source;video.play().catch(()=>{});}
+   else{
+    const Hls=await loadHlsScript();
+    if(Hls.isSupported()){const hls=new Hls({enableWorker:true,lowLatencyMode:true});hls.loadSource(source);hls.attachMedia(video);hls.on(Hls.Events.ERROR,(event,data)=>{if(data&&data.fatal)addMediaFallback(container,raw,"O fluxo HLS não pôde ser reproduzido. Pode exigir autenticação, permitir CORS ou estar offline.");});}
+    else throw new Error("Este navegador não suporta HLS neste formato.");
+   }
+  }else{video.src=source;video.play().catch(()=>{});}
+  addMediaFallback(container,raw,"Se não iniciar, verifique se o link é público e se o servidor permite reprodução no navegador (CORS).");
+ }catch(err){
+  container.className="media-placeholder";container.innerHTML="";
+  container.textContent="Não foi possível abrir esta lista/stream: "+(err&&err.message?err.message:"erro de reprodução")+".";
+  addMediaFallback(container,raw,"Limitações comuns: listas M3U bloqueadas por CORS, IPTV com login, links expirados ou stream incompatível. Teste um link direto .m3u8 público.");
+ }
 }
 let lastMediaUrl="";
 async function syncMedia(){
