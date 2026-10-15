@@ -113,7 +113,7 @@ function addMediaFallback(container,raw,message){
  const box=document.createElement("div");box.className="media-help";box.style.marginTop="8px";box.textContent=message;container.appendChild(box);
  if(raw){const link=document.createElement("a");link.href=raw.trim().match(/^https?:\/\//i)?raw.trim():"https://"+raw.trim();link.target="_blank";link.rel="noopener noreferrer";link.textContent="Abrir link original em nova aba";link.style.display="inline-block";link.style.marginTop="8px";link.style.color="#b9dcff";link.style.fontWeight="700";container.appendChild(link);}
 }
-function isPlaylistUrl(url){return /\.m3u(?:$|[?#])/i.test(url);}
+function isPlaylistUrl(url){try{const u=new URL(url);return /\.m3u(?:$|[?#])/i.test(u.href)||/(?:^|[?&])(?:type=m3u(?:_plus)?|output=m3u8?)(?:&|$)/i.test(u.search)||/\/get\.php$/i.test(u.pathname);}catch(e){return /\.m3u(?:$|[?#])/i.test(url);}}
 function isHlsUrl(url){return /\.m3u8(?:$|[?#])/i.test(url);}
 function absolutePlaylistEntry(entry,base){try{return new URL(entry,base).href;}catch(e){return "";}}
 async function resolveM3uPlaylist(url){
