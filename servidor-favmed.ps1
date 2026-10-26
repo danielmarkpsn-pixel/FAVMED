@@ -4,12 +4,14 @@ $Port = 2222
 $PortCandidates = @(2222)
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $DataFile = Join-Path $Root "fila.json"
+$DeletedFile = Join-Path $Root "pacientes-excluidos.json"
 $MediaFile = Join-Path $Root "midia.json"
 $SlideshowDir = Join-Path $Root "midia-sala"
 $DocumentsDir = Join-Path $Root "documentos-pacientes"
 if (-not (Test-Path $DocumentsDir)) { New-Item -ItemType Directory -Path $DocumentsDir | Out-Null }
 if (-not (Test-Path $SlideshowDir)) { New-Item -ItemType Directory -Path $SlideshowDir | Out-Null }
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+if (-not (Test-Path $DeletedFile)) { [System.IO.File]::WriteAllText($DeletedFile, "[]", $Utf8NoBom) }
 if (-not (Test-Path $DataFile)) { [System.IO.File]::WriteAllText($DataFile, "[]", $Utf8NoBom) }
 if (-not (Test-Path $MediaFile)) { [System.IO.File]::WriteAllText($MediaFile, '{"url":""}', $Utf8NoBom) }
 $listener = $null
@@ -174,6 +176,22 @@ try {
           if (-not (Test-Path -LiteralPath $docPath -PathType Leaf)) { throw "Not found" }
           $responseBytes = [System.IO.File]::ReadAllBytes($docPath); $type = "application/pdf"
         } catch { $status = "404 Not Found"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes("Documento não encontrado") }
+      } elseif ($path -eq "/api/delete" -and $method -eq "POST") {
+        try {
+          if ($contentLength -gt 16384 -or $read -ne $contentLength) { throw "Invalid request" }
+          $deleteRequest = ConvertFrom-Json -InputObject ([System.Text.Encoding]::UTF8.GetString($bodyBytes))
+          if ([string]$deleteRequest.password -cne "7931") { $status = "403 Forbidden"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"error":"authorization denied"}'); $type = "application/json; charset=utf-8" }
+          elseif ([string]::IsNullOrWhiteSpace([string]$deleteRequest.id)) { throw "Missing patient id" }
+          else {
+            $currentPatients = @(ConvertFrom-Json -InputObject ([System.IO.File]::ReadAllText($DataFile, [System.Text.Encoding]::UTF8)))
+            $remainingPatients = @($currentPatients | Where-Object { [string]$_.id -ne [string]$deleteRequest.id })
+            [System.IO.File]::WriteAllText($DataFile, (ConvertTo-Json -InputObject @($remainingPatients) -Compress -Depth 30), $Utf8NoBom)
+            $deletedIds = @(ConvertFrom-Json -InputObject ([System.IO.File]::ReadAllText($DeletedFile, [System.Text.Encoding]::UTF8)))
+            if ($deletedIds -notcontains [string]$deleteRequest.id) { $deletedIds += [string]$deleteRequest.id }
+            [System.IO.File]::WriteAllText($DeletedFile, (ConvertTo-Json -InputObject @($deletedIds) -Compress), $Utf8NoBom)
+            $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"ok":true}'); $type = "application/json; charset=utf-8"
+          }
+        } catch { $status = "400 Bad Request"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"error":"invalid delete request"}'); $type = "application/json; charset=utf-8" }
       } elseif ($path -eq "/api/state" -and $method -eq "GET") {
         $responseBytes = [System.IO.File]::ReadAllBytes($DataFile); $type = "application/json; charset=utf-8"
       } elseif ($path -eq "/api/state" -and $method -eq "POST") {
@@ -183,7 +201,20 @@ try {
           try {
             $parsed = ConvertFrom-Json -InputObject $json
             if ($parsed -isnot [System.Array] -and $null -ne $parsed) { throw "Expected JSON array" }
-            [System.IO.File]::WriteAllText($DataFile, $json, $Utf8NoBom)
+            $deletedIds = @(ConvertFrom-Json -InputObject ([System.IO.File]::ReadAllText($DeletedFile, [System.Text.Encoding]::UTF8)))
+            $incomingPatients = @($parsed | Where-Object { $null -ne $_ -and -not [string]::IsNullOrWhiteSpace([string]$_.id) -and $deletedIds -notcontains [string]$_.id })
+            $existingPatients = @()
+            if (Test-Path $DataFile) { $existingPatients = @(ConvertFrom-Json -InputObject ([System.IO.File]::ReadAllText($DataFile, [System.Text.Encoding]::UTF8))) }
+            $incomingById = @{}
+            foreach ($patient in $incomingPatients) { $incomingById[[string]$patient.id] = $patient }
+            $mergedPatients = New-Object System.Collections.ArrayList
+            foreach ($patient in $incomingPatients) { [void]$mergedPatients.Add($patient) }
+            foreach ($patient in $existingPatients) {
+              $patientId = [string]$patient.id
+              if (-not [string]::IsNullOrWhiteSpace($patientId) -and $deletedIds -notcontains $patientId -and -not $incomingById.ContainsKey($patientId)) { [void]$mergedPatients.Add($patient) }
+            }
+            $savedJson = ConvertTo-Json -InputObject @($mergedPatients.ToArray()) -Compress -Depth 30
+            [System.IO.File]::WriteAllText($DataFile, $savedJson, $Utf8NoBom)
             $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"ok":true}'); $type = "application/json; charset=utf-8"
           } catch { $status = "400 Bad Request"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"error":"invalid JSON"}'); $type = "application/json; charset=utf-8" }
         }
