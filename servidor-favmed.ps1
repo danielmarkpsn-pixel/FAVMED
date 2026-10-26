@@ -5,13 +5,13 @@ $PortCandidates = @(2222)
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $DataFile = Join-Path $Root "fila.json"
 $DeletedFile = Join-Path $Root "pacientes-excluidos.json"
-if (-not (Test-Path $DeletedFile)) { [System.IO.File]::WriteAllText($DeletedFile, "[]", $Utf8NoBom) }
 $MediaFile = Join-Path $Root "midia.json"
 $SlideshowDir = Join-Path $Root "midia-sala"
 $DocumentsDir = Join-Path $Root "documentos-pacientes"
 if (-not (Test-Path $DocumentsDir)) { New-Item -ItemType Directory -Path $DocumentsDir | Out-Null }
 if (-not (Test-Path $SlideshowDir)) { New-Item -ItemType Directory -Path $SlideshowDir | Out-Null }
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+if (-not (Test-Path $DeletedFile)) { [System.IO.File]::WriteAllText($DeletedFile, "[]", $Utf8NoBom) }
 if (-not (Test-Path $DataFile)) { [System.IO.File]::WriteAllText($DataFile, "[]", $Utf8NoBom) }
 if (-not (Test-Path $MediaFile)) { [System.IO.File]::WriteAllText($MediaFile, '{"url":""}', $Utf8NoBom) }
 $listener = $null
