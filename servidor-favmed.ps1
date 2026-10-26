@@ -198,8 +198,6 @@ try {
           $normalized = ConvertTo-Json -InputObject @($unique.ToArray()) -Depth 30 -Compress
           $original = [System.IO.File]::ReadAllText($DataFile, [System.Text.Encoding]::UTF8).Trim()
           if ($normalized -ne $original) {
-            $backupPath = $DataFile + ".before-dedup-" + (Get-Date -Format "yyyyMMdd-HHmmss") + ".bak"
-            [System.IO.File]::Copy($DataFile, $backupPath, $false)
             [System.IO.File]::WriteAllText($DataFile, $normalized, $Utf8NoBom)
           }
           $responseBytes = [System.Text.Encoding]::UTF8.GetBytes($normalized); $type = "application/json; charset=utf-8"
