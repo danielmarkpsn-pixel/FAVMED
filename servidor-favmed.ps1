@@ -42,20 +42,31 @@ try {
   Write-Host ""
   Write-Host "Enderecos para outros dispositivos:" -ForegroundColor Yellow
   $ips = @()
-  # Prioriza a interface IPv4 ativa com gateway (normalmente Wi-Fi ou cabo).
+  # Mostra primeiro apenas endereços da interface com rota padrão (Wi-Fi/cabo).
+  # Isso evita listar adaptadores virtuais do WSL, Docker e VPN como se fossem a LAN.
   try {
-    $ips += Get-NetIPConfiguration -ErrorAction Stop |
-      Where-Object { $_.NetAdapter.Status -eq "Up" } |
-      ForEach-Object { $_.IPv4Address } |
-      Where-Object { $_.IPAddress -and $_.IPAddress -notlike "127.*" -and $_.IPAddress -notlike "169.254.*" } |
-      ForEach-Object { $_.IPAddress }
+    $networkConfigs = @(Get-NetIPConfiguration -ErrorAction Stop | Where-Object {
+      $_.NetAdapter.Status -eq "Up" -and $_.IPv4Address -and $_.IPv4DefaultGateway
+    })
+    foreach ($config in $networkConfigs) {
+      foreach ($address in $config.IPv4Address) {
+        if ($address.IPAddress -and $address.IPAddress -notlike "127.*" -and $address.IPAddress -notlike "169.254.*") {
+          $ips += [string]$address.IPAddress
+        }
+      }
+    }
   } catch { }
-  # Alternativa para sistemas sem o cmdlet ou sem gateway detectado.
+  # Fallback: endereços IPv4 não loopback/link-local; remove a faixa virtual 172.16–172.31.
   if ($ips.Count -eq 0) {
     $ips += [System.Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces() |
       Where-Object { $_.OperationalStatus -eq "Up" -and $_.NetworkInterfaceType -ne "Loopback" } |
       ForEach-Object { $_.GetIPProperties().UnicastAddresses } |
-      Where-Object { $_.Address.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork -and $_.Address.ToString() -notlike "169.254.*" -and $_.Address.ToString() -notlike "127.*" } |
+      Where-Object {
+        $_.Address.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork -and
+        $_.Address.ToString() -notlike "169.254.*" -and
+        $_.Address.ToString() -notlike "127.*" -and
+        $_.Address.ToString() -notmatch "^172\.(1[6-9]|2[0-9]|3[01])\."
+      } |
       ForEach-Object { $_.Address.ToString() }
   }
   $ips = @($ips | Select-Object -Unique)
@@ -183,13 +194,32 @@ try {
           if ([string]$deleteRequest.password -cne "7931") { $status = "403 Forbidden"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"error":"authorization denied"}'); $type = "application/json; charset=utf-8" }
           elseif ([string]::IsNullOrWhiteSpace([string]$deleteRequest.id)) { throw "Missing patient id" }
           else {
+            if (-not (Test-Path -LiteralPath $DataFile -PathType Leaf)) { throw "Patient data file not found" }
             $currentPatients = @(ConvertFrom-Json -InputObject ([System.IO.File]::ReadAllText($DataFile, [System.Text.Encoding]::UTF8)))
-            $remainingPatients = @($currentPatients | Where-Object { [string]$_.id -ne [string]$deleteRequest.id })
-            [System.IO.File]::WriteAllText($DataFile, (ConvertTo-Json -InputObject @($remainingPatients) -Compress -Depth 30), $Utf8NoBom)
-            $deletedIds = @(ConvertFrom-Json -InputObject ([System.IO.File]::ReadAllText($DeletedFile, [System.Text.Encoding]::UTF8)))
-            if ($deletedIds -notcontains [string]$deleteRequest.id) { $deletedIds += [string]$deleteRequest.id }
-            [System.IO.File]::WriteAllText($DeletedFile, (ConvertTo-Json -InputObject @($deletedIds) -Compress), $Utf8NoBom)
-            $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"ok":true}'); $type = "application/json; charset=utf-8"
+            $targetId = [string]$deleteRequest.id
+            $matches = @($currentPatients | Where-Object { [string]$_.id -ceq $targetId })
+            if ($matches.Count -ne 1) {
+              $status = "409 Conflict"
+              $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"error":"patient not found or duplicate ID; no data changed"}')
+              $type = "application/json; charset=utf-8"
+            } else {
+              $remainingPatients = @($currentPatients | Where-Object { [string]$_.id -cne $targetId })
+              if ($remainingPatients.Count -ne ($currentPatients.Count - 1)) { throw "Safety check failed: deletion would remove more than one patient" }
+              $savedJson = ConvertTo-Json -InputObject ([object[]]$remainingPatients) -Compress -Depth 30
+              $verify = @(ConvertFrom-Json -InputObject $savedJson)
+              if ($verify.Count -ne $remainingPatients.Count) { throw "Safety check failed: serialized patient count mismatch" }
+              $backupDir = Join-Path $Root "backups"
+              if (-not (Test-Path -LiteralPath $backupDir -PathType Container)) { [void](New-Item -ItemType Directory -Path $backupDir -Force) }
+              $backupPath = Join-Path $backupDir ("fila-before-delete-" + (Get-Date -Format "yyyyMMdd-HHmmss-fff") + ".json")
+              Copy-Item -LiteralPath $DataFile -Destination $backupPath -ErrorAction Stop
+              $tempPath = $DataFile + ".delete-tmp"
+              [System.IO.File]::WriteAllText($tempPath, $savedJson, $Utf8NoBom)
+              Move-Item -LiteralPath $tempPath -Destination $DataFile -Force -ErrorAction Stop
+              $deletedIds = @(ConvertFrom-Json -InputObject ([System.IO.File]::ReadAllText($DeletedFile, [System.Text.Encoding]::UTF8)))
+              if ($deletedIds -notcontains $targetId) { $deletedIds += $targetId }
+              [System.IO.File]::WriteAllText($DeletedFile, (ConvertTo-Json -InputObject ([object[]]$deletedIds) -Compress), $Utf8NoBom)
+              $responseBytes = [System.Text.Encoding]::UTF8.GetBytes((ConvertTo-Json -InputObject @{ok=$true;deletedId=$targetId;remainingCount=$remainingPatients.Count} -Compress)); $type = "application/json; charset=utf-8"
+            }
           }
         } catch { $status = "400 Bad Request"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"error":"invalid delete request"}'); $type = "application/json; charset=utf-8" }
       } elseif ($path -eq "/api/state" -and $method -eq "GET") {
