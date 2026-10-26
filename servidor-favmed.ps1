@@ -211,15 +211,40 @@ try {
             if ($parsed -isnot [System.Array] -and $null -ne $parsed) { throw "Expected JSON array" }
             $existing = @()
             try { $existing = @(ConvertFrom-Json -InputObject ([System.IO.File]::ReadAllText($DataFile, [System.Text.Encoding]::UTF8))) } catch { $existing = @() }
+            $unique = New-Object 'System.Collections.Generic.List[object]'
+            $seenIds = @{}
+            $seenVisits = @{}
+            foreach ($patient in @($parsed)) {
+              if ($null -eq $patient) { continue }
+              $idKey = [string]$patient.id
+              $cpfKey = ([string]$patient.cpf -replace '\D', '')
+              $dayKey = [string]$patient.day
+              $visitKey = if ($cpfKey.Length -ge 11 -and $dayKey) { $cpfKey + "|" + $dayKey } else { "" }
+              if (($idKey -and $seenIds.ContainsKey($idKey)) -or ($visitKey -and $seenVisits.ContainsKey($visitKey))) { continue }
+              if ($idKey) { $seenIds[$idKey] = $true }
+              if ($visitKey) { $seenVisits[$visitKey] = $true }
+              $unique.Add($patient)
+            }
+            $parsed = @($unique.ToArray())
             $newIds = @($parsed | ForEach-Object { [string]$_.id })
             $removed = @($existing | Where-Object { $newIds -notcontains [string]$_.id })
             if ($removed.Count -gt 0 -and [string]$deleteAuthorization -cne "7931") {
-              # Normal reception/professional updates post a snapshot. A stale browser may not know about
-              # every patient, so merge missing records instead of rejecting calls, ASO updates, or new registrations.
+              # Keep records omitted by a stale browser without re-adding the same visit twice.
               $merged = @($parsed)
-              foreach ($missingPatient in $removed) { $merged += $missingPatient }
-              $json = ConvertTo-Json -InputObject @($merged) -Depth 30 -Compress
+              foreach ($missingPatient in $removed) {
+                $idKey = [string]$missingPatient.id
+                $cpfKey = ([string]$missingPatient.cpf -replace '\D', '')
+                $dayKey = [string]$missingPatient.day
+                $visitKey = if ($cpfKey.Length -ge 11 -and $dayKey) { $cpfKey + "|" + $dayKey } else { "" }
+                $alreadyPresent = $false
+                foreach ($current in $merged) {
+                  if (($idKey -and [string]$current.id -eq $idKey) -or ($visitKey -and ([string]$current.cpf -replace '\D', '') + "|" + [string]$current.day -eq $visitKey)) { $alreadyPresent = $true; break }
+                }
+                if (-not $alreadyPresent) { $merged += $missingPatient }
+              }
+              $parsed = @($merged)
             }
+            $json = ConvertTo-Json -InputObject @($parsed) -Depth 30 -Compress
             [System.IO.File]::WriteAllText($DataFile, $json, $Utf8NoBom)
             $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"ok":true}'); $type = "application/json; charset=utf-8"
           } catch { $status = "400 Bad Request"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"error":"invalid JSON or state"}'); $type = "application/json; charset=utf-8" }
