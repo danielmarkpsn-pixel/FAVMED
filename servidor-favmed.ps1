@@ -183,13 +183,32 @@ try {
           if ([string]$deleteRequest.password -cne "7931") { $status = "403 Forbidden"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"error":"authorization denied"}'); $type = "application/json; charset=utf-8" }
           elseif ([string]::IsNullOrWhiteSpace([string]$deleteRequest.id)) { throw "Missing patient id" }
           else {
+            if (-not (Test-Path -LiteralPath $DataFile -PathType Leaf)) { throw "Patient data file not found" }
             $currentPatients = @(ConvertFrom-Json -InputObject ([System.IO.File]::ReadAllText($DataFile, [System.Text.Encoding]::UTF8)))
-            $remainingPatients = @($currentPatients | Where-Object { [string]$_.id -ne [string]$deleteRequest.id })
-            [System.IO.File]::WriteAllText($DataFile, (ConvertTo-Json -InputObject @($remainingPatients) -Compress -Depth 30), $Utf8NoBom)
-            $deletedIds = @(ConvertFrom-Json -InputObject ([System.IO.File]::ReadAllText($DeletedFile, [System.Text.Encoding]::UTF8)))
-            if ($deletedIds -notcontains [string]$deleteRequest.id) { $deletedIds += [string]$deleteRequest.id }
-            [System.IO.File]::WriteAllText($DeletedFile, (ConvertTo-Json -InputObject @($deletedIds) -Compress), $Utf8NoBom)
-            $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"ok":true}'); $type = "application/json; charset=utf-8"
+            $targetId = [string]$deleteRequest.id
+            $matches = @($currentPatients | Where-Object { [string]$_.id -ceq $targetId })
+            if ($matches.Count -ne 1) {
+              $status = "409 Conflict"
+              $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"error":"patient not found or duplicate ID; no data changed"}')
+              $type = "application/json; charset=utf-8"
+            } else {
+              $remainingPatients = @($currentPatients | Where-Object { [string]$_.id -cne $targetId })
+              if ($remainingPatients.Count -ne ($currentPatients.Count - 1)) { throw "Safety check failed: deletion would remove more than one patient" }
+              $savedJson = ConvertTo-Json -InputObject ([object[]]$remainingPatients) -Compress -Depth 30
+              $verify = @(ConvertFrom-Json -InputObject $savedJson)
+              if ($verify.Count -ne $remainingPatients.Count) { throw "Safety check failed: serialized patient count mismatch" }
+              $backupDir = Join-Path $Root "backups"
+              if (-not (Test-Path -LiteralPath $backupDir -PathType Container)) { [void](New-Item -ItemType Directory -Path $backupDir -Force) }
+              $backupPath = Join-Path $backupDir ("fila-before-delete-" + (Get-Date -Format "yyyyMMdd-HHmmss-fff") + ".json")
+              Copy-Item -LiteralPath $DataFile -Destination $backupPath -ErrorAction Stop
+              $tempPath = $DataFile + ".delete-tmp"
+              [System.IO.File]::WriteAllText($tempPath, $savedJson, $Utf8NoBom)
+              Move-Item -LiteralPath $tempPath -Destination $DataFile -Force -ErrorAction Stop
+              $deletedIds = @(ConvertFrom-Json -InputObject ([System.IO.File]::ReadAllText($DeletedFile, [System.Text.Encoding]::UTF8)))
+              if ($deletedIds -notcontains $targetId) { $deletedIds += $targetId }
+              [System.IO.File]::WriteAllText($DeletedFile, (ConvertTo-Json -InputObject ([object[]]$deletedIds) -Compress), $Utf8NoBom)
+              $responseBytes = [System.Text.Encoding]::UTF8.GetBytes((ConvertTo-Json -InputObject @{ok=$true;deletedId=$targetId;remainingCount=$remainingPatients.Count} -Compress)); $type = "application/json; charset=utf-8"
+            }
           }
         } catch { $status = "400 Bad Request"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"error":"invalid delete request"}'); $type = "application/json; charset=utf-8" }
       } elseif ($path -eq "/api/state" -and $method -eq "GET") {
