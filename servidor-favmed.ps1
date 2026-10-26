@@ -196,12 +196,16 @@ try {
             $unique.Add($patient)
           }
           $normalized = ConvertTo-Json -InputObject @($unique.ToArray()) -Depth 30 -Compress
-          [System.IO.File]::WriteAllText($DataFile, $normalized, $Utf8NoBom)
+          $original = [System.IO.File]::ReadAllText($DataFile, [System.Text.Encoding]::UTF8).Trim()
+          if ($normalized -ne $original) {
+            $backupPath = $DataFile + ".before-dedup-" + (Get-Date -Format "yyyyMMdd-HHmmss") + ".bak"
+            [System.IO.File]::Copy($DataFile, $backupPath, $false)
+            [System.IO.File]::WriteAllText($DataFile, $normalized, $Utf8NoBom)
+          }
           $responseBytes = [System.Text.Encoding]::UTF8.GetBytes($normalized); $type = "application/json; charset=utf-8"
         } catch {
           $responseBytes = [System.IO.File]::ReadAllBytes($DataFile); $type = "application/json; charset=utf-8"
         }
-        $responseBytes = [System.IO.File]::ReadAllBytes($DataFile); $type = "application/json; charset=utf-8"
       } elseif ($path -eq "/api/state" -and $method -eq "POST") {
         if ($contentLength -gt 1048576 -or $read -ne $contentLength) { $status = "413 Payload Too Large"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes("Payload too large") }
         else {
