@@ -179,6 +179,28 @@ try {
           $responseBytes = [System.IO.File]::ReadAllBytes($docPath); $type = "application/pdf"
         } catch { $status = "404 Not Found"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes("Documento não encontrado") }
       } elseif ($path -eq "/api/state" -and $method -eq "GET") {
+        try {
+          $stored = @(ConvertFrom-Json -InputObject ([System.IO.File]::ReadAllText($DataFile, [System.Text.Encoding]::UTF8)))
+          $unique = New-Object 'System.Collections.Generic.List[object]'
+          $seenIds = @{}
+          $seenVisits = @{}
+          foreach ($patient in $stored) {
+            if ($null -eq $patient) { continue }
+            $idKey = [string]$patient.id
+            $cpfKey = ([string]$patient.cpf -replace '\D', '')
+            $dayKey = [string]$patient.day
+            $visitKey = if ($cpfKey.Length -ge 11 -and $dayKey) { $cpfKey + "|" + $dayKey } else { "" }
+            if (($idKey -and $seenIds.ContainsKey($idKey)) -or ($visitKey -and $seenVisits.ContainsKey($visitKey))) { continue }
+            if ($idKey) { $seenIds[$idKey] = $true }
+            if ($visitKey) { $seenVisits[$visitKey] = $true }
+            $unique.Add($patient)
+          }
+          $normalized = ConvertTo-Json -InputObject @($unique.ToArray()) -Depth 30 -Compress
+          [System.IO.File]::WriteAllText($DataFile, $normalized, $Utf8NoBom)
+          $responseBytes = [System.Text.Encoding]::UTF8.GetBytes($normalized); $type = "application/json; charset=utf-8"
+        } catch {
+          $responseBytes = [System.IO.File]::ReadAllBytes($DataFile); $type = "application/json; charset=utf-8"
+        }
         $responseBytes = [System.IO.File]::ReadAllBytes($DataFile); $type = "application/json; charset=utf-8"
       } elseif ($path -eq "/api/state" -and $method -eq "POST") {
         if ($contentLength -gt 1048576 -or $read -ne $contentLength) { $status = "413 Payload Too Large"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes("Payload too large") }
