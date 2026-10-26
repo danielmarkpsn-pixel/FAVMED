@@ -42,20 +42,31 @@ try {
   Write-Host ""
   Write-Host "Enderecos para outros dispositivos:" -ForegroundColor Yellow
   $ips = @()
-  # Prioriza a interface IPv4 ativa com gateway (normalmente Wi-Fi ou cabo).
+  # Mostra primeiro apenas endereços da interface com rota padrão (Wi-Fi/cabo).
+  # Isso evita listar adaptadores virtuais do WSL, Docker e VPN como se fossem a LAN.
   try {
-    $ips += Get-NetIPConfiguration -ErrorAction Stop |
-      Where-Object { $_.NetAdapter.Status -eq "Up" } |
-      ForEach-Object { $_.IPv4Address } |
-      Where-Object { $_.IPAddress -and $_.IPAddress -notlike "127.*" -and $_.IPAddress -notlike "169.254.*" } |
-      ForEach-Object { $_.IPAddress }
+    $networkConfigs = @(Get-NetIPConfiguration -ErrorAction Stop | Where-Object {
+      $_.NetAdapter.Status -eq "Up" -and $_.IPv4Address -and $_.IPv4DefaultGateway
+    })
+    foreach ($config in $networkConfigs) {
+      foreach ($address in $config.IPv4Address) {
+        if ($address.IPAddress -and $address.IPAddress -notlike "127.*" -and $address.IPAddress -notlike "169.254.*") {
+          $ips += [string]$address.IPAddress
+        }
+      }
+    }
   } catch { }
-  # Alternativa para sistemas sem o cmdlet ou sem gateway detectado.
+  # Fallback: endereços IPv4 não loopback/link-local; remove a faixa virtual 172.16–172.31.
   if ($ips.Count -eq 0) {
     $ips += [System.Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces() |
       Where-Object { $_.OperationalStatus -eq "Up" -and $_.NetworkInterfaceType -ne "Loopback" } |
       ForEach-Object { $_.GetIPProperties().UnicastAddresses } |
-      Where-Object { $_.Address.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork -and $_.Address.ToString() -notlike "169.254.*" -and $_.Address.ToString() -notlike "127.*" } |
+      Where-Object {
+        $_.Address.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork -and
+        $_.Address.ToString() -notlike "169.254.*" -and
+        $_.Address.ToString() -notlike "127.*" -and
+        $_.Address.ToString() -notmatch "^172\.(1[6-9]|2[0-9]|3[01])\."
+      } |
       ForEach-Object { $_.Address.ToString() }
   }
   $ips = @($ips | Select-Object -Unique)
