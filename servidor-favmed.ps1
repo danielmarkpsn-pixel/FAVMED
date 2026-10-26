@@ -242,7 +242,15 @@ try {
                 $visitKey = if ($cpfKey.Length -ge 11 -and $dayKey) { $cpfKey + "|" + $dayKey } else { "" }
                 $alreadyPresent = $false
                 foreach ($current in $merged) {
-                  if (($idKey -and [string]$current.id -eq $idKey) -or ($visitKey -and ([string]$current.cpf -replace '\D', '') + "|" + [string]$current.day -eq $visitKey)) { $alreadyPresent = $true; break }
+                  $currentId = [string]$current.id
+                  $currentCpf = ([string]$current.cpf -replace '\D', '')
+                  $currentDay = [string]$current.day
+                  $currentVisitKey = ""
+                  if ($currentCpf.Length -ge 11 -and $currentDay) { $currentVisitKey = $currentCpf + "|" + $currentDay }
+                  if (($idKey -ne "" -and $currentId -eq $idKey) -or ($visitKey -ne "" -and $currentVisitKey -eq $visitKey)) {
+                    $alreadyPresent = $true
+                    break
+                  }
                 }
                 if (-not $alreadyPresent) { $merged += $missingPatient }
               }
