@@ -192,12 +192,15 @@ try {
             $newIds = @($parsed | ForEach-Object { [string]$_.id })
             $removed = @($existing | Where-Object { $newIds -notcontains [string]$_.id })
             if ($removed.Count -gt 0 -and [string]$deleteAuthorization -cne "7931") {
-              $status = "403 Forbidden"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"error":"delete authorization required"}'); $type = "application/json; charset=utf-8"
-            } else {
-              [System.IO.File]::WriteAllText($DataFile, $json, $Utf8NoBom)
-              $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"ok":true}'); $type = "application/json; charset=utf-8"
+              # Normal reception/professional updates post a snapshot. A stale browser may not know about
+              # every patient, so merge missing records instead of rejecting calls, ASO updates, or new registrations.
+              $merged = @($parsed)
+              foreach ($missingPatient in $removed) { $merged += $missingPatient }
+              $json = ConvertTo-Json -InputObject @($merged) -Depth 30 -Compress
             }
-          } catch { $status = "400 Bad Request"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"error":"invalid JSON"}'); $type = "application/json; charset=utf-8" }
+            [System.IO.File]::WriteAllText($DataFile, $json, $Utf8NoBom)
+            $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"ok":true}'); $type = "application/json; charset=utf-8"
+          } catch { $status = "400 Bad Request"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"error":"invalid JSON or state"}'); $type = "application/json; charset=utf-8" }
         }
       } elseif ($path -eq "/sala" -or $path -eq "/sala/" -or $path -eq "/sala-espera" -or $path -eq "/sala-espera/") {
         $responseBytes = [System.IO.File]::ReadAllBytes((Join-Path $Root "index.html")); $type = "text/html; charset=utf-8"
