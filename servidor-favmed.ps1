@@ -183,8 +183,16 @@ try {
           try {
             $parsed = ConvertFrom-Json -InputObject $json
             if ($parsed -isnot [System.Array] -and $null -ne $parsed) { throw "Expected JSON array" }
-            [System.IO.File]::WriteAllText($DataFile, $json, $Utf8NoBom)
-            $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"ok":true}'); $type = "application/json; charset=utf-8"
+            $existing = @()
+            try { $existing = @(ConvertFrom-Json -InputObject ([System.IO.File]::ReadAllText($DataFile, [System.Text.Encoding]::UTF8))) } catch { $existing = @() }
+            $newIds = @($parsed | ForEach-Object { [string]$_.id })
+            $removed = @($existing | Where-Object { $newIds -notcontains [string]$_.id })
+            if ($removed.Count -gt 0 -and [string]$request.Headers["X-FAVMED-Delete-Authorization"] -cne "7931") {
+              $status = "403 Forbidden"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"error":"delete authorization required"}'); $type = "application/json; charset=utf-8"
+            } else {
+              [System.IO.File]::WriteAllText($DataFile, $json, $Utf8NoBom)
+              $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"ok":true}'); $type = "application/json; charset=utf-8"
+            }
           } catch { $status = "400 Bad Request"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"error":"invalid JSON"}'); $type = "application/json; charset=utf-8" }
         }
       } elseif ($path -eq "/sala" -or $path -eq "/sala/" -or $path -eq "/sala-espera" -or $path -eq "/sala-espera/") {
