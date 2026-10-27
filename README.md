@@ -1,4 +1,5 @@
-# FAVMED SGA — sistema de gestão de atendimentos
+# FAVMED Local — Chamador de pacientes para Windows
+
 Aplicativo local da Clínica Favmed para recepção, sala de espera e profissionais. Compartilha a fila entre dispositivos da mesma rede local, usando o PowerShell incluído no Windows; não exige Node.js nem instalar programas adicionais.
 
 ## Arquivos principais
