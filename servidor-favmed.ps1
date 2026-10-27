@@ -4,7 +4,6 @@ $Port = 2222
 $PortCandidates = @(2222)
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $DataFile = Join-Path $Root "fila.json"
-$DeletedIdsFile = Join-Path $Root "pacientes-excluidos.json"
 $MediaFile = Join-Path $Root "midia.json"
 $SlideshowDir = Join-Path $Root "midia-sala"
 $DocumentsDir = Join-Path $Root "documentos-pacientes"
@@ -12,7 +11,6 @@ if (-not (Test-Path $DocumentsDir)) { New-Item -ItemType Directory -Path $Docume
 if (-not (Test-Path $SlideshowDir)) { New-Item -ItemType Directory -Path $SlideshowDir | Out-Null }
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 if (-not (Test-Path $DataFile)) { [System.IO.File]::WriteAllText($DataFile, "[]", $Utf8NoBom) }
-if (-not (Test-Path $DeletedIdsFile)) { [System.IO.File]::WriteAllText($DeletedIdsFile, "[]", $Utf8NoBom) }
 if (-not (Test-Path $MediaFile)) { [System.IO.File]::WriteAllText($MediaFile, '{"url":""}', $Utf8NoBom) }
 $listener = $null
 foreach ($candidatePort in $PortCandidates) {
@@ -42,24 +40,27 @@ try {
   Write-Host ""
   Write-Host "Enderecos para outros dispositivos:" -ForegroundColor Yellow
   $ips = @()
+  # Prioriza a interface IPv4 ativa com gateway (normalmente Wi-Fi ou cabo).
   try {
-    $configs = @(Get-NetIPConfiguration -ErrorAction Stop | Where-Object { $_.NetAdapter.Status -eq "Up" -and $_.IPv4Address -and $_.IPv4DefaultGateway })
-    foreach ($config in $configs) { foreach ($address in @($config.IPv4Address)) { if ($address.IPAddress -and $address.IPAddress -notlike "127.*" -and $address.IPAddress -notlike "169.254.*") { $ips += $address.IPAddress } } }
+    $ips += Get-NetIPConfiguration -ErrorAction Stop |
+      Where-Object { $_.NetAdapter.Status -eq "Up" } |
+      ForEach-Object { $_.IPv4Address } |
+      Where-Object { $_.IPAddress -and $_.IPAddress -notlike "127.*" -and $_.IPAddress -notlike "169.254.*" } |
+      ForEach-Object { $_.IPAddress }
   } catch { }
+  # Alternativa para sistemas sem o cmdlet ou sem gateway detectado.
   if ($ips.Count -eq 0) {
     $ips += [System.Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces() |
-      Where-Object { $_.OperationalStatus -eq "Up" -and $_.NetworkInterfaceType -in @("Wireless80211", "Ethernet") } |
+      Where-Object { $_.OperationalStatus -eq "Up" -and $_.NetworkInterfaceType -ne "Loopback" } |
       ForEach-Object { $_.GetIPProperties().UnicastAddresses } |
       Where-Object { $_.Address.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork -and $_.Address.ToString() -notlike "169.254.*" -and $_.Address.ToString() -notlike "127.*" } |
       ForEach-Object { $_.Address.ToString() }
   }
   $ips = @($ips | Select-Object -Unique)
-  if ($ips.Count -eq 0) { Write-Host "AVISO: nao consegui detectar o IPv4 da rede local. Verifique a conexao Wi-Fi/cabo." -ForegroundColor Yellow }
-  else {
-    $ip = $ips[0]
-    Write-Host ("Recepcao: http://{0}:{1}/" -f $ip, $Port)
-    Write-Host ("Sala:     http://{0}:{1}/sala" -f $ip, $Port)
-    Write-Host ("Profissional: http://{0}:{1}/consultorio" -f $ip, $Port)
+  if ($ips.Count -eq 0) {
+    Write-Host "AVISO: nao consegui detectar um IPv4 da rede. Verifique se o computador esta conectado ao Wi-Fi ou cabo." -ForegroundColor Yellow
+  } else {
+    foreach ($ip in $ips) { Write-Host ("Recepcao: http://{0}:{1}/" -f $ip, $Port); Write-Host ("Sala:     http://{0}:{1}/sala" -f $ip, $Port); Write-Host ("Profissional: http://{0}:{1}/consultorio" -f $ip, $Port) }
   }
   # Abre automaticamente o sistema no navegador da recepcao.
   try { Start-Process ("http://127.0.0.1:{0}/" -f $Port) } catch { Write-Host "Abra manualmente o endereco local mostrado acima." -ForegroundColor Yellow }
@@ -90,11 +91,7 @@ try {
       $requestTarget = $request[1]
       $path = $requestTarget.Split('?')[0]
       $contentLength = 0
-      $deleteAuthorization = ""
-      foreach ($line in $lines) {
-        if ($line -match "(?i)^Content-Length:\s*(\d+)") { $contentLength = [int]$Matches[1] }
-        if ($line -match "(?i)^X-FAVMED-Delete-Authorization:\s*(.*)$") { $deleteAuthorization = $Matches[1].Trim() }
-      }
+      foreach ($line in $lines) { if ($line -match "(?i)^Content-Length:\s*(\d+)") { $contentLength = [int]$Matches[1] } }
       $bodyBytes = New-Object byte[] $contentLength
       $read = 0
       while ($read -lt $contentLength) {
@@ -179,21 +176,6 @@ try {
         } catch { $status = "404 Not Found"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes("Documento não encontrado") }
       } elseif ($path -eq "/api/state" -and $method -eq "GET") {
         $responseBytes = [System.IO.File]::ReadAllBytes($DataFile); $type = "application/json; charset=utf-8"
-      } elseif ($path -eq "/api/state" -and $method -eq "DELETE") {
-        try {
-          if ($deleteAuthorization -cne "7931") { throw "Unauthorized" }
-          $query = ""; if ($requestTarget.Contains("?")) { $query = $requestTarget.Substring($requestTarget.IndexOf("?") + 1) }
-          $targetId = ""; foreach ($part in ($query -split "&")) { if ($part -match "^id=(.*)$") { $targetId = [Uri]::UnescapeDataString($Matches[1].Replace("+", " ")) } }
-          if ([string]::IsNullOrWhiteSpace($targetId)) { throw "Missing patient id" }
-          $existing = @(ConvertFrom-Json -InputObject ([System.IO.File]::ReadAllText($DataFile, [System.Text.Encoding]::UTF8)))
-          $remaining = @($existing | Where-Object { [string]$_.id -cne $targetId })
-          if ($remaining.Count -eq $existing.Count) { $status = "404 Not Found"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"error":"Paciente não encontrado"}') }
-          else { $json = ConvertTo-Json -InputObject @($remaining) -Depth 30 -Compress; [System.IO.File]::WriteAllText($DataFile, $json, $Utf8NoBom); $deletedIds = @(); try { $deletedIds = @(ConvertFrom-Json -InputObject ([System.IO.File]::ReadAllText($DeletedIdsFile, [System.Text.Encoding]::UTF8)) | ForEach-Object { [string]$_ }) } catch { }; if ($deletedIds -notcontains $targetId) { $deletedIds += $targetId }; [System.IO.File]::WriteAllText($DeletedIdsFile, (ConvertTo-Json -InputObject @($deletedIds) -Compress), $Utf8NoBom); $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"ok":true}'); $type = "application/json; charset=utf-8" }
-        } catch {
-          if ($deleteAuthorization -cne "7931") { $status = "403 Forbidden"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"error":"Senha de autorização incorreta"}') }
-          else { $status = "400 Bad Request"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"error":"Não foi possível excluir o paciente"}') }
-          $type = "application/json; charset=utf-8"
-        }
       } elseif ($path -eq "/api/state" -and $method -eq "POST") {
         if ($contentLength -gt 1048576 -or $read -ne $contentLength) { $status = "413 Payload Too Large"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes("Payload too large") }
         else {
@@ -201,14 +183,7 @@ try {
           try {
             $parsed = ConvertFrom-Json -InputObject $json
             if ($parsed -isnot [System.Array] -and $null -ne $parsed) { throw "Expected JSON array" }
-            $incoming = $parsed
-            $deletedIds = @(); try { $deletedIds = @(ConvertFrom-Json -InputObject ([System.IO.File]::ReadAllText($DeletedIdsFile, [System.Text.Encoding]::UTF8)) | ForEach-Object { [string]$_ }) } catch { }
-            $existing = @(ConvertFrom-Json -InputObject ([System.IO.File]::ReadAllText($DataFile, [System.Text.Encoding]::UTF8)))
-            $merged = New-Object 'System.Collections.Generic.List[object]'; $byId = @{}
-            foreach ($patient in $existing) { if ($null -eq $patient) { continue }; $idKey = [string]$patient.id; if ($idKey -and $byId.ContainsKey($idKey)) { continue }; if ($idKey) { $byId[$idKey] = $merged.Count }; $merged.Add($patient) }
-            foreach ($patient in @($incoming)) { if ($null -eq $patient) { continue }; $idKey = [string]$patient.id; if ($idKey -and $deletedIds -contains $idKey) { continue }; if ($idKey -and $byId.ContainsKey($idKey)) { $merged[$byId[$idKey]] = $patient } else { if ($idKey) { $byId[$idKey] = $merged.Count }; $merged.Add($patient) } }
-            $mergedJson = ConvertTo-Json -InputObject @($merged.ToArray()) -Depth 30 -Compress
-            [System.IO.File]::WriteAllText($DataFile, $mergedJson, $Utf8NoBom)
+            [System.IO.File]::WriteAllText($DataFile, $json, $Utf8NoBom)
             $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"ok":true}'); $type = "application/json; charset=utf-8"
           } catch { $status = "400 Bad Request"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"error":"invalid JSON"}'); $type = "application/json; charset=utf-8" }
         }
