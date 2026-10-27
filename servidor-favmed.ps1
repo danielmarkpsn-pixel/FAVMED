@@ -56,7 +56,7 @@ try {
       Where-Object { $_.Address.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork -and $_.Address.ToString() -notlike "169.254.*" -and $_.Address.ToString() -notlike "127.*" } |
       ForEach-Object { $_.Address.ToString() }
   }
-  $ips = @($ips | Select-Object -Unique)
+  $ips = @($ips | Select-Object -Unique | Select-Object -First 1)
   if ($ips.Count -eq 0) {
     Write-Host "AVISO: nao consegui detectar um IPv4 da rede. Verifique se o computador esta conectado ao Wi-Fi ou cabo." -ForegroundColor Yellow
   } else {
