@@ -379,7 +379,7 @@ function showReceptionFicha(p){
  const safe=value=>String(value??"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
  w.document.write("<!doctype html><html lang='pt-BR'><head><meta charset='utf-8'><title>Ficha - "+safe(p.name||"Paciente")+"</title><style>@page{size:A4 portrait;margin:18mm}body{font:15px Arial;color:#20313a;line-height:1.6}h1{color:#087f8c}section{border:1px solid #dce5e9;border-radius:10px;padding:20px;white-space:pre-line}</style></head><body><button onclick='print()'>Imprimir / Salvar em PDF</button><h1>Clínica Favmed — Ficha do paciente</h1><section>"+safe(content)+"</section></body></html>");
  w.document.close();
-});
+}
 
 function xlsxEscape(value){return String(value??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&apos;");}
 function xlsxCol(n){let s="";while(n){const r=(n-1)%26;s=String.fromCharCode(65+r)+s;n=Math.floor((n-1)/26);}return s;}
