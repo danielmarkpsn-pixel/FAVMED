@@ -4,6 +4,7 @@ $Port = 2222
 $PortCandidates = @(2222)
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $DataFile = Join-Path $Root "fila.json"
+$DeletedIdsFile = Join-Path $Root "pacientes-excluidos.json"
 $MediaFile = Join-Path $Root "midia.json"
 $SlideshowDir = Join-Path $Root "midia-sala"
 $DocumentsDir = Join-Path $Root "documentos-pacientes"
@@ -11,6 +12,7 @@ if (-not (Test-Path $DocumentsDir)) { New-Item -ItemType Directory -Path $Docume
 if (-not (Test-Path $SlideshowDir)) { New-Item -ItemType Directory -Path $SlideshowDir | Out-Null }
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 if (-not (Test-Path $DataFile)) { [System.IO.File]::WriteAllText($DataFile, "[]", $Utf8NoBom) }
+if (-not (Test-Path $DeletedIdsFile)) { [System.IO.File]::WriteAllText($DeletedIdsFile, "[]", $Utf8NoBom) }
 if (-not (Test-Path $MediaFile)) { [System.IO.File]::WriteAllText($MediaFile, '{"url":""}', $Utf8NoBom) }
 $listener = $null
 foreach ($candidatePort in $PortCandidates) {
@@ -186,7 +188,7 @@ try {
           $existing = @(ConvertFrom-Json -InputObject ([System.IO.File]::ReadAllText($DataFile, [System.Text.Encoding]::UTF8)))
           $remaining = @($existing | Where-Object { [string]$_.id -cne $targetId })
           if ($remaining.Count -eq $existing.Count) { $status = "404 Not Found"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"error":"Paciente não encontrado"}') }
-          else { $json = ConvertTo-Json -InputObject @($remaining) -Depth 30 -Compress; [System.IO.File]::WriteAllText($DataFile, $json, $Utf8NoBom); $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"ok":true}'); $type = "application/json; charset=utf-8" }
+          else { $json = ConvertTo-Json -InputObject @($remaining) -Depth 30 -Compress; [System.IO.File]::WriteAllText($DataFile, $json, $Utf8NoBom); $deletedIds = @(); try { $deletedIds = @(ConvertFrom-Json -InputObject ([System.IO.File]::ReadAllText($DeletedIdsFile, [System.Text.Encoding]::UTF8)) | ForEach-Object { [string]$_ }) } catch { }; if ($deletedIds -notcontains $targetId) { $deletedIds += $targetId }; [System.IO.File]::WriteAllText($DeletedIdsFile, (ConvertTo-Json -InputObject @($deletedIds) -Compress), $Utf8NoBom); $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"ok":true}'); $type = "application/json; charset=utf-8" }
         } catch {
           if ($deleteAuthorization -cne "7931") { $status = "403 Forbidden"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"error":"Senha de autorização incorreta"}') }
           else { $status = "400 Bad Request"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"error":"Não foi possível excluir o paciente"}') }
@@ -200,10 +202,11 @@ try {
             $parsed = ConvertFrom-Json -InputObject $json
             if ($parsed -isnot [System.Array] -and $null -ne $parsed) { throw "Expected JSON array" }
             $incoming = $parsed
+            $deletedIds = @(); try { $deletedIds = @(ConvertFrom-Json -InputObject ([System.IO.File]::ReadAllText($DeletedIdsFile, [System.Text.Encoding]::UTF8)) | ForEach-Object { [string]$_ }) } catch { }
             $existing = @(ConvertFrom-Json -InputObject ([System.IO.File]::ReadAllText($DataFile, [System.Text.Encoding]::UTF8)))
             $merged = New-Object 'System.Collections.Generic.List[object]'; $byId = @{}
             foreach ($patient in $existing) { if ($null -eq $patient) { continue }; $idKey = [string]$patient.id; if ($idKey -and $byId.ContainsKey($idKey)) { continue }; if ($idKey) { $byId[$idKey] = $merged.Count }; $merged.Add($patient) }
-            foreach ($patient in @($incoming)) { if ($null -eq $patient) { continue }; $idKey = [string]$patient.id; if ($idKey -and $byId.ContainsKey($idKey)) { $merged[$byId[$idKey]] = $patient } else { if ($idKey) { $byId[$idKey] = $merged.Count }; $merged.Add($patient) } }
+            foreach ($patient in @($incoming)) { if ($null -eq $patient) { continue }; $idKey = [string]$patient.id; if ($idKey -and $deletedIds -contains $idKey) { continue }; if ($idKey -and $byId.ContainsKey($idKey)) { $merged[$byId[$idKey]] = $patient } else { if ($idKey) { $byId[$idKey] = $merged.Count }; $merged.Add($patient) } }
             $mergedJson = ConvertTo-Json -InputObject @($merged.ToArray()) -Depth 30 -Compress
             [System.IO.File]::WriteAllText($DataFile, $mergedJson, $Utf8NoBom)
             $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"ok":true}'); $type = "application/json; charset=utf-8"
