@@ -183,7 +183,6 @@ try {
           $stored = @(ConvertFrom-Json -InputObject ([System.IO.File]::ReadAllText($DataFile, [System.Text.Encoding]::UTF8)))
           $unique = New-Object 'System.Collections.Generic.List[object]'
           $seenIds = @{}
-          $seenVisits = @{}
           foreach ($patient in $stored) {
             if ($null -eq $patient) { continue }
             $idKey = [string]$patient.id
@@ -192,57 +191,70 @@ try {
             $unique.Add($patient)
           }
           $normalized = ConvertTo-Json -InputObject @($unique.ToArray()) -Depth 30 -Compress
-          $original = [System.IO.File]::ReadAllText($DataFile, [System.Text.Encoding]::UTF8).Trim()
-          if ($normalized -ne $original) {
-            [System.IO.File]::WriteAllText($DataFile, $normalized, $Utf8NoBom)
-          }
+          # GET nunca altera o arquivo de dados; apenas devolve a fila normalizada.
           $responseBytes = [System.Text.Encoding]::UTF8.GetBytes($normalized); $type = "application/json; charset=utf-8"
         } catch {
-          $responseBytes = [System.IO.File]::ReadAllBytes($DataFile); $type = "application/json; charset=utf-8"
+          $status = "500 Internal Server Error"
+          $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"error":"Não foi possível ler a fila"}'); $type = "application/json; charset=utf-8"
+        }
+      } elseif ($path -eq "/api/state" -and $method -eq "DELETE") {
+        try {
+          if ([string]$deleteAuthorization -cne "7931") { throw "Unauthorized" }
+          $query = ""
+          if ($requestTarget.Contains("?")) { $query = $requestTarget.Substring($requestTarget.IndexOf("?") + 1) }
+          $targetId = ""
+          foreach ($part in ($query -split "&")) {
+            if ($part -match "^id=(.*)$") { $targetId = [Uri]::UnescapeDataString($Matches[1].Replace("+", " ")) }
+          }
+          if ([string]::IsNullOrWhiteSpace($targetId)) { throw "Missing patient id" }
+          $existing = @(ConvertFrom-Json -InputObject ([System.IO.File]::ReadAllText($DataFile, [System.Text.Encoding]::UTF8)))
+          $remaining = @($existing | Where-Object { [string]$_.id -cne $targetId })
+          if ($remaining.Count -eq $existing.Count) {
+            $status = "404 Not Found"
+            $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"error":"Paciente não encontrado"}')
+          } else {
+            $json = ConvertTo-Json -InputObject @($remaining) -Depth 30 -Compress
+            [System.IO.File]::WriteAllText($DataFile, $json, $Utf8NoBom)
+            $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"ok":true}'); $type = "application/json; charset=utf-8"
+          }
+        } catch {
+          if ([string]$deleteAuthorization -cne "7931") { $status = "403 Forbidden"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"error":"Senha de autorização incorreta"}') }
+          else { $status = "400 Bad Request"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"error":"Não foi possível excluir o paciente"}') }
+          $type = "application/json; charset=utf-8"
         }
       } elseif ($path -eq "/api/state" -and $method -eq "POST") {
         if ($contentLength -gt 1048576 -or $read -ne $contentLength) { $status = "413 Payload Too Large"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes("Payload too large") }
         else {
-          $json = [System.Text.Encoding]::UTF8.GetString($bodyBytes)
           try {
-            $parsed = ConvertFrom-Json -InputObject $json
-            if ($parsed -isnot [System.Array] -and $null -ne $parsed) { throw "Expected JSON array" }
-            $existing = @()
-            try { $existing = @(ConvertFrom-Json -InputObject ([System.IO.File]::ReadAllText($DataFile, [System.Text.Encoding]::UTF8))) } catch { $existing = @() }
-            $unique = New-Object 'System.Collections.Generic.List[object]'
-            $seenIds = @{}
-            $seenVisits = @{}
-            foreach ($patient in @($parsed)) {
+            $incoming = ConvertFrom-Json -InputObject ([System.Text.Encoding]::UTF8.GetString($bodyBytes))
+            if ($incoming -isnot [System.Array] -and $null -ne $incoming) { throw "Expected JSON array" }
+            $existing = @(ConvertFrom-Json -InputObject ([System.IO.File]::ReadAllText($DataFile, [System.Text.Encoding]::UTF8)))
+            $merged = New-Object 'System.Collections.Generic.List[object]'
+            $byId = @{}
+            # Existing records remain unless deleted through the password-protected DELETE endpoint.
+            foreach ($patient in $existing) {
               if ($null -eq $patient) { continue }
               $idKey = [string]$patient.id
-              if ($idKey -and $seenIds.ContainsKey($idKey)) { continue }
-              if ($idKey) { $seenIds[$idKey] = $true }
-              $unique.Add($patient)
+              if ($idKey -and $byId.ContainsKey($idKey)) { continue }
+              if ($idKey) { $byId[$idKey] = $merged.Count }
+              $merged.Add($patient)
             }
-            $parsed = @($unique.ToArray())
-            $newIds = @($parsed | ForEach-Object { [string]$_.id })
-            $removed = @($existing | Where-Object { $newIds -notcontains [string]$_.id })
-            if ($removed.Count -gt 0 -and [string]$deleteAuthorization -cne "7931") {
-              # Keep records omitted by a stale browser without re-adding the same visit twice.
-              $merged = @($parsed)
-              foreach ($missingPatient in $removed) {
-                $idKey = [string]$missingPatient.id
-                $alreadyPresent = $false
-                foreach ($current in $merged) {
-                  $currentId = [string]$current.id
-                  if ($idKey -ne "" -and $currentId -eq $idKey) {
-                    $alreadyPresent = $true
-                    break
-                  }
-                }
-                if (-not $alreadyPresent) { $merged += $missingPatient }
+            foreach ($patient in @($incoming)) {
+              if ($null -eq $patient) { continue }
+              $idKey = [string]$patient.id
+              if ($idKey -and $byId.ContainsKey($idKey)) {
+                $merged[$byId[$idKey]] = $patient
+              } else {
+                if ($idKey) { $byId[$idKey] = $merged.Count }
+                $merged.Add($patient)
               }
-              $parsed = @($merged)
             }
-            $json = ConvertTo-Json -InputObject @($parsed) -Depth 30 -Compress
+            $json = ConvertTo-Json -InputObject @($merged.ToArray()) -Depth 30 -Compress
             [System.IO.File]::WriteAllText($DataFile, $json, $Utf8NoBom)
             $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"ok":true}'); $type = "application/json; charset=utf-8"
-          } catch { $status = "400 Bad Request"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"error":"invalid JSON or state"}'); $type = "application/json; charset=utf-8" }
+          } catch {
+            $status = "400 Bad Request"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"error":"invalid JSON or state"}'); $type = "application/json; charset=utf-8"
+          }
         }
       } elseif ($path -eq "/sala" -or $path -eq "/sala/" -or $path -eq "/sala-espera" -or $path -eq "/sala-espera/") {
         $responseBytes = [System.IO.File]::ReadAllBytes((Join-Path $Root "index.html")); $type = "text/html; charset=utf-8"
