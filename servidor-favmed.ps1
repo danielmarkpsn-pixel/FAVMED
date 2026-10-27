@@ -43,15 +43,15 @@ try {
   # Prioriza a interface IPv4 ativa com gateway (normalmente Wi-Fi ou cabo).
   try {
     $ips += Get-NetIPConfiguration -ErrorAction Stop |
-      Where-Object { $_.NetAdapter.Status -eq "Up" } |
+      Where-Object { $_.NetAdapter.Status -eq "Up" -and $_.IPv4DefaultGateway } |
       ForEach-Object { $_.IPv4Address } |
       Where-Object { $_.IPAddress -and $_.IPAddress -notlike "127.*" -and $_.IPAddress -notlike "169.254.*" } |
       ForEach-Object { $_.IPAddress }
   } catch { }
-  # Alternativa para sistemas sem o cmdlet ou sem gateway detectado.
+  # Alternativa: usa interfaces físicas ativas e ignora adaptadores virtuais comuns.
   if ($ips.Count -eq 0) {
     $ips += [System.Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces() |
-      Where-Object { $_.OperationalStatus -eq "Up" -and $_.NetworkInterfaceType -ne "Loopback" } |
+      Where-Object { $_.OperationalStatus -eq "Up" -and $_.NetworkInterfaceType -ne "Loopback" -and $_.Name -notmatch "(?i)wsl|hyper-v|virtual|vmware|virtualbox|docker|vethernet|vpn|tailscale|zerotier" -and $_.Description -notmatch "(?i)wsl|hyper-v|virtual|vmware|virtualbox|docker|vpn|tailscale|zerotier" } |
       ForEach-Object { $_.GetIPProperties().UnicastAddresses } |
       Where-Object { $_.Address.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork -and $_.Address.ToString() -notlike "169.254.*" -and $_.Address.ToString() -notlike "127.*" } |
       ForEach-Object { $_.Address.ToString() }
@@ -187,12 +187,8 @@ try {
           foreach ($patient in $stored) {
             if ($null -eq $patient) { continue }
             $idKey = [string]$patient.id
-            $cpfKey = ([string]$patient.cpf -replace '\D', '')
-            $dayKey = [string]$patient.day
-            $visitKey = if ($cpfKey.Length -ge 11 -and $dayKey) { $cpfKey + "|" + $dayKey } else { "" }
-            if (($idKey -and $seenIds.ContainsKey($idKey)) -or ($visitKey -and $seenVisits.ContainsKey($visitKey))) { continue }
+            if ($idKey -and $seenIds.ContainsKey($idKey)) { continue }
             if ($idKey) { $seenIds[$idKey] = $true }
-            if ($visitKey) { $seenVisits[$visitKey] = $true }
             $unique.Add($patient)
           }
           $normalized = ConvertTo-Json -InputObject @($unique.ToArray()) -Depth 30 -Compress
@@ -219,12 +215,8 @@ try {
             foreach ($patient in @($parsed)) {
               if ($null -eq $patient) { continue }
               $idKey = [string]$patient.id
-              $cpfKey = ([string]$patient.cpf -replace '\D', '')
-              $dayKey = [string]$patient.day
-              $visitKey = if ($cpfKey.Length -ge 11 -and $dayKey) { $cpfKey + "|" + $dayKey } else { "" }
-              if (($idKey -and $seenIds.ContainsKey($idKey)) -or ($visitKey -and $seenVisits.ContainsKey($visitKey))) { continue }
+              if ($idKey -and $seenIds.ContainsKey($idKey)) { continue }
               if ($idKey) { $seenIds[$idKey] = $true }
-              if ($visitKey) { $seenVisits[$visitKey] = $true }
               $unique.Add($patient)
             }
             $parsed = @($unique.ToArray())
@@ -235,17 +227,10 @@ try {
               $merged = @($parsed)
               foreach ($missingPatient in $removed) {
                 $idKey = [string]$missingPatient.id
-                $cpfKey = ([string]$missingPatient.cpf -replace '\D', '')
-                $dayKey = [string]$missingPatient.day
-                $visitKey = if ($cpfKey.Length -ge 11 -and $dayKey) { $cpfKey + "|" + $dayKey } else { "" }
                 $alreadyPresent = $false
                 foreach ($current in $merged) {
                   $currentId = [string]$current.id
-                  $currentCpf = ([string]$current.cpf -replace '\D', '')
-                  $currentDay = [string]$current.day
-                  $currentVisitKey = ""
-                  if ($currentCpf.Length -ge 11 -and $currentDay) { $currentVisitKey = $currentCpf + "|" + $currentDay }
-                  if (($idKey -ne "" -and $currentId -eq $idKey) -or ($visitKey -ne "" -and $currentVisitKey -eq $visitKey)) {
+                  if ($idKey -ne "" -and $currentId -eq $idKey) {
                     $alreadyPresent = $true
                     break
                   }
