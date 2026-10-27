@@ -43,20 +43,20 @@ try {
   # Prioriza a interface IPv4 ativa com gateway (normalmente Wi-Fi ou cabo).
   try {
     $ips += Get-NetIPConfiguration -ErrorAction Stop |
-      Where-Object { $_.NetAdapter.Status -eq "Up" -and $_.IPv4DefaultGateway } |
+      Where-Object { $_.NetAdapter.Status -eq "Up" } |
       ForEach-Object { $_.IPv4Address } |
       Where-Object { $_.IPAddress -and $_.IPAddress -notlike "127.*" -and $_.IPAddress -notlike "169.254.*" } |
       ForEach-Object { $_.IPAddress }
   } catch { }
-  # Alternativa: usa interfaces físicas ativas e ignora adaptadores virtuais comuns.
+  # Alternativa para sistemas sem o cmdlet ou sem gateway detectado.
   if ($ips.Count -eq 0) {
     $ips += [System.Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces() |
-      Where-Object { $_.OperationalStatus -eq "Up" -and $_.NetworkInterfaceType -ne "Loopback" -and $_.Name -notmatch "(?i)wsl|hyper-v|virtual|vmware|virtualbox|docker|vethernet|vpn|tailscale|zerotier" -and $_.Description -notmatch "(?i)wsl|hyper-v|virtual|vmware|virtualbox|docker|vpn|tailscale|zerotier" } |
+      Where-Object { $_.OperationalStatus -eq "Up" -and $_.NetworkInterfaceType -ne "Loopback" } |
       ForEach-Object { $_.GetIPProperties().UnicastAddresses } |
       Where-Object { $_.Address.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork -and $_.Address.ToString() -notlike "169.254.*" -and $_.Address.ToString() -notlike "127.*" } |
       ForEach-Object { $_.Address.ToString() }
   }
-  $ips = @($ips | Select-Object -Unique | Select-Object -First 1)
+  $ips = @($ips | Select-Object -Unique)
   if ($ips.Count -eq 0) {
     Write-Host "AVISO: nao consegui detectar um IPv4 da rede. Verifique se o computador esta conectado ao Wi-Fi ou cabo." -ForegroundColor Yellow
   } else {
@@ -91,11 +91,7 @@ try {
       $requestTarget = $request[1]
       $path = $requestTarget.Split('?')[0]
       $contentLength = 0
-      $deleteAuthorization = ""
-      foreach ($line in $lines) {
-        if ($line -match "(?i)^Content-Length:\s*(\d+)") { $contentLength = [int]$Matches[1] }
-        if ($line -match "(?i)^X-FAVMED-Delete-Authorization:\s*(.*?)\s*$") { $deleteAuthorization = $Matches[1].Trim() }
-      }
+      foreach ($line in $lines) { if ($line -match "(?i)^Content-Length:\s*(\d+)") { $contentLength = [int]$Matches[1] } }
       $bodyBytes = New-Object byte[] $contentLength
       $read = 0
       while ($read -lt $contentLength) {
@@ -179,82 +175,17 @@ try {
           $responseBytes = [System.IO.File]::ReadAllBytes($docPath); $type = "application/pdf"
         } catch { $status = "404 Not Found"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes("Documento não encontrado") }
       } elseif ($path -eq "/api/state" -and $method -eq "GET") {
-        try {
-          $stored = @(ConvertFrom-Json -InputObject ([System.IO.File]::ReadAllText($DataFile, [System.Text.Encoding]::UTF8)))
-          $unique = New-Object 'System.Collections.Generic.List[object]'
-          $seenIds = @{}
-          foreach ($patient in $stored) {
-            if ($null -eq $patient) { continue }
-            $idKey = [string]$patient.id
-            if ($idKey -and $seenIds.ContainsKey($idKey)) { continue }
-            if ($idKey) { $seenIds[$idKey] = $true }
-            $unique.Add($patient)
-          }
-          $normalized = ConvertTo-Json -InputObject @($unique.ToArray()) -Depth 30 -Compress
-          # GET nunca altera o arquivo de dados; apenas devolve a fila normalizada.
-          $responseBytes = [System.Text.Encoding]::UTF8.GetBytes($normalized); $type = "application/json; charset=utf-8"
-        } catch {
-          $status = "500 Internal Server Error"
-          $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"error":"Não foi possível ler a fila"}'); $type = "application/json; charset=utf-8"
-        }
-      } elseif ($path -eq "/api/state" -and $method -eq "DELETE") {
-        try {
-          if ([string]$deleteAuthorization -cne "7931") { throw "Unauthorized" }
-          $query = ""
-          if ($requestTarget.Contains("?")) { $query = $requestTarget.Substring($requestTarget.IndexOf("?") + 1) }
-          $targetId = ""
-          foreach ($part in ($query -split "&")) {
-            if ($part -match "^id=(.*)$") { $targetId = [Uri]::UnescapeDataString($Matches[1].Replace("+", " ")) }
-          }
-          if ([string]::IsNullOrWhiteSpace($targetId)) { throw "Missing patient id" }
-          $existing = @(ConvertFrom-Json -InputObject ([System.IO.File]::ReadAllText($DataFile, [System.Text.Encoding]::UTF8)))
-          $remaining = @($existing | Where-Object { [string]$_.id -cne $targetId })
-          if ($remaining.Count -eq $existing.Count) {
-            $status = "404 Not Found"
-            $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"error":"Paciente não encontrado"}')
-          } else {
-            $json = ConvertTo-Json -InputObject @($remaining) -Depth 30 -Compress
-            [System.IO.File]::WriteAllText($DataFile, $json, $Utf8NoBom)
-            $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"ok":true}'); $type = "application/json; charset=utf-8"
-          }
-        } catch {
-          if ([string]$deleteAuthorization -cne "7931") { $status = "403 Forbidden"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"error":"Senha de autorização incorreta"}') }
-          else { $status = "400 Bad Request"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"error":"Não foi possível excluir o paciente"}') }
-          $type = "application/json; charset=utf-8"
-        }
+        $responseBytes = [System.IO.File]::ReadAllBytes($DataFile); $type = "application/json; charset=utf-8"
       } elseif ($path -eq "/api/state" -and $method -eq "POST") {
         if ($contentLength -gt 1048576 -or $read -ne $contentLength) { $status = "413 Payload Too Large"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes("Payload too large") }
         else {
+          $json = [System.Text.Encoding]::UTF8.GetString($bodyBytes)
           try {
-            $incoming = ConvertFrom-Json -InputObject ([System.Text.Encoding]::UTF8.GetString($bodyBytes))
-            if ($incoming -isnot [System.Array] -and $null -ne $incoming) { throw "Expected JSON array" }
-            $existing = @(ConvertFrom-Json -InputObject ([System.IO.File]::ReadAllText($DataFile, [System.Text.Encoding]::UTF8)))
-            $merged = New-Object 'System.Collections.Generic.List[object]'
-            $byId = @{}
-            # Existing records remain unless deleted through the password-protected DELETE endpoint.
-            foreach ($patient in $existing) {
-              if ($null -eq $patient) { continue }
-              $idKey = [string]$patient.id
-              if ($idKey -and $byId.ContainsKey($idKey)) { continue }
-              if ($idKey) { $byId[$idKey] = $merged.Count }
-              $merged.Add($patient)
-            }
-            foreach ($patient in @($incoming)) {
-              if ($null -eq $patient) { continue }
-              $idKey = [string]$patient.id
-              if ($idKey -and $byId.ContainsKey($idKey)) {
-                $merged[$byId[$idKey]] = $patient
-              } else {
-                if ($idKey) { $byId[$idKey] = $merged.Count }
-                $merged.Add($patient)
-              }
-            }
-            $json = ConvertTo-Json -InputObject @($merged.ToArray()) -Depth 30 -Compress
+            $parsed = ConvertFrom-Json -InputObject $json
+            if ($parsed -isnot [System.Array] -and $null -ne $parsed) { throw "Expected JSON array" }
             [System.IO.File]::WriteAllText($DataFile, $json, $Utf8NoBom)
             $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"ok":true}'); $type = "application/json; charset=utf-8"
-          } catch {
-            $status = "400 Bad Request"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"error":"invalid JSON or state"}'); $type = "application/json; charset=utf-8"
-          }
+          } catch { $status = "400 Bad Request"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"error":"invalid JSON"}'); $type = "application/json; charset=utf-8" }
         }
       } elseif ($path -eq "/sala" -or $path -eq "/sala/" -or $path -eq "/sala-espera" -or $path -eq "/sala-espera/") {
         $responseBytes = [System.IO.File]::ReadAllBytes((Join-Path $Root "index.html")); $type = "text/html; charset=utf-8"
