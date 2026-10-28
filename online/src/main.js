@@ -125,7 +125,21 @@ function renderInvitePassword() {
 }
 async function callMasterAction(body) {
   const { data, error } = await supabase.functions.invoke('master-users', { body });
-  if (error) throw new Error(data?.error || error.message || 'Falha ao comunicar com a função administrativa.');
+  if (error) {
+    // FunctionsHttpError may carry the structured JSON response on its
+    // Response context. Clone it before reading so the original stays usable.
+    let serverMessage = '';
+    try {
+      const response = error.context;
+      if (response && typeof response.clone === 'function') {
+        const payload = await response.clone().json();
+        serverMessage = typeof payload?.error === 'string' ? payload.error : '';
+      }
+    } catch {
+      // Fall back to the SDK error if the response has no JSON body.
+    }
+    throw new Error(serverMessage || data?.error || error.message || 'Falha ao comunicar com a função administrativa.');
+  }
   if (data?.error) throw new Error(data.error);
   return data;
 }
