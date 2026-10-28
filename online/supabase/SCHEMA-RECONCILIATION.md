@@ -41,7 +41,7 @@ O schema atual é somente a base de autenticação/perfis. Não há ainda tabela
 
 ## Validações de segurança pendentes
 
-- O Security Advisor reporta `auth_leaked_password_protection`: proteção contra senhas comprometidas desativada.
+- A proteção nativa contra senhas comprometidas não está disponível no plano Supabase atual. Essa limitação está documentada e **não é requisito bloqueante**; não solicitar upgrade nem afirmar que o recurso foi ativado.
 - Confirmar cadastro público e login anônimo desativados.
 - Testar que usuários não-Master recebem 403 nas operações administrativas.
 - Testar o comportamento de sessão de usuário inativo, incluindo tokens já emitidos.
