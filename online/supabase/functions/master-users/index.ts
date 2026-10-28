@@ -58,6 +58,9 @@ Deno.serve(async (req: Request) => {
   } catch {
     return json({ error: "Corpo da requisição inválido." }, 400);
   }
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return json({ error: "Corpo da requisição inválido." }, 400);
+  }
 
   if (body.action === "list_users") {
     const { data: profiles, error: listError } = await admin
@@ -92,7 +95,7 @@ Deno.serve(async (req: Request) => {
     const { data: created, error: createError } = await admin.auth.admin.createUser({
       email,
       password,
-      email_confirm: true,
+      email_confirm: false,
     });
     if (createError || !created.user) {
       return json({ error: "Não foi possível criar a conta. Verifique se o e-mail já está cadastrado." }, 400);
