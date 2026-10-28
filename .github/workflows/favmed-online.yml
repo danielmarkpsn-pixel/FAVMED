@@ -18,7 +18,7 @@ permissions:
 
 jobs:
   build-online:
-    name: Build FAVMED Online
+    name: Check and build FAVMED Online
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -32,5 +32,7 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: npm install --no-audit --no-fund
+      - name: Check JavaScript syntax
+        run: npm run check
       - name: Build application
         run: npm run build
