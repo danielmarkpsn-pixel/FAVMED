@@ -131,12 +131,43 @@ Deno.serve(async (req: Request) => {
       return json({ error: "O bloqueio de contas Master exige um procedimento administrativo separado." }, 403);
     }
 
-    const { error: updateError } = await admin
-      .from("profiles")
-      .update({ active, updated_at: new Date().toISOString() })
-      .eq("id", targetId);
+    // Ban/unban through Auth Admin so the account cannot start or refresh a session
+    // while disabled. Existing access JWTs may remain valid until expiry, so every
+    // future operational table must also enforce profiles.active in its RLS policies.
+    if (active) {
+      const { error: unbanError } = await admin.auth.admin.updateUserById(targetId, {
+        ban_duration: "none",
+      });
+      if (unbanError) return json({ error: "Não foi possível reativar a autenticação da conta." }, 500);
 
-    if (updateError) return json({ error: "Não foi possível atualizar o acesso." }, 500);
+      const { error: activateError } = await admin
+        .from("profiles")
+        .update({ active: true, updated_at: new Date().toISOString() })
+        .eq("id", targetId);
+
+      if (activateError) {
+        await admin.auth.admin.updateUserById(targetId, { ban_duration: "876000h" });
+        return json({ error: "Não foi possível ativar o perfil; a autenticação permaneceu bloqueada." }, 500);
+      }
+    } else {
+      const { error: deactivateError } = await admin
+        .from("profiles")
+        .update({ active: false, updated_at: new Date().toISOString() })
+        .eq("id", targetId);
+
+      if (deactivateError) return json({ error: "Não foi possível desativar o perfil." }, 500);
+
+      const { error: banError } = await admin.auth.admin.updateUserById(targetId, {
+        ban_duration: "876000h",
+      });
+      if (banError) {
+        await admin.from("profiles")
+          .update({ active: true, updated_at: new Date().toISOString() })
+          .eq("id", targetId);
+        return json({ error: "Não foi possível bloquear a autenticação; o perfil foi restaurado como ativo." }, 500);
+      }
+    }
+
     return json({ user_id: targetId, active });
   }
 
