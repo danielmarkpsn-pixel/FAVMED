@@ -8,32 +8,21 @@ Status: pendências operacionais documentadas; este arquivo não altera configur
 - Não aplicar migrações ao projeto remoto de desenvolvimento até reconciliar o histórico e validar a migração em ambiente isolado.
 - Não mesclar a branch `feature/favmed-online-master-login` nem alterar `main` sem autorização explícita.
 - Não compartilhar chaves `service_role`/secret, senhas, tokens ou credenciais SMTP.
+- A proteção nativa contra senhas comprometidas não está disponível no plano Supabase atual. Ela não é um requisito bloqueante deste projeto; não solicitar upgrade nem declarar que foi ativada.
 
 ## 1. Configurar a origem permitida da Edge Function
 
 A função `master-users` versão 4 usa a variável `FAVMED_ALLOWED_ORIGIN`; sem ela, o padrão é `http://localhost:5173`.
 
 1. No Supabase Dashboard do projeto FAVMED, abra **Edge Functions → Secrets**.
-2. Defina `FAVMED_ALLOWED_ORIGIN` com **uma origem exata** que corresponda ao endereço usado pelo navegador, incluindo protocolo e porta, sem caminho ou barra final. Exemplos: `http://localhost:5173` para teste local ou `https://<dominio-aprovado>` após definir o domínio de produção.
+2. Defina `FAVMED_ALLOWED_ORIGIN` com **uma origem exata** que corresponda ao endereço usado pelo navegador, incluindo protocolo e porta, sem caminho ou barra final. Exemplo: `http://localhost:5173` para teste local ou `https://<dominio-aprovado>` após definir o domínio de produção.
 3. Não use `*` e não adicione IPs ou domínios não aprovados.
 4. Se a aplicação for acessada por endereços diferentes (localhost, IP da rede e domínio publicado), escolha um endereço canônico para a validação ou implemente uma lista explícita revisada; não relaxe o CORS para resolver erros.
 5. Teste no navegador: a origem autorizada deve conseguir chamar a função; uma origem diferente deve receber HTTP 403. Verifique também o preflight OPTIONS.
 
 A configuração não é considerada concluída até que a origem real seja confirmada e o teste seja realizado.
 
-## 2. Ativar proteção contra senhas comprometidas
-
-O Security Advisor sinalizou `auth_leaked_password_protection`.
-
-1. No Supabase Dashboard do projeto FAVMED, abra **Authentication → Settings / Security and Protection** (o nome pode variar conforme a versão do painel).
-2. Ative a proteção contra senhas comprometidas / leaked password protection.
-3. Salve a configuração.
-4. Reabra **Security Advisor** e confirme que o alerta foi removido. Se o recurso não estiver disponível no plano, documente isso e não declare o alerta resolvido.
-5. Faça um teste controlado com uma senha de teste comprometida conhecida, sem usar senha pessoal ou de produção, e confirme que Auth a rejeita.
-
-Não é possível marcar esta pendência como resolvida apenas com a alteração de código do repositório.
-
-## 3. Limite de envio de convites e SMTP
+## 2. Limite de envio de convites e SMTP
 
 A função retorna HTTP 429 (`INVITE_RATE_LIMITED`) quando o Supabase Auth limita os envios e HTTP 409 (`INVITE_EMAIL_EXISTS`) quando o e-mail já tem conta.
 
@@ -42,7 +31,7 @@ A função retorna HTTP 429 (`INVITE_RATE_LIMITED`) quando o Supabase Auth limit
 - Um HTTP 201 significa que o pedido de convite foi aceito, não prova por si só a entrega na caixa de entrada.
 - Para testar, usar um endereço controlado e apenas uma tentativa após a liberação do limite.
 
-## 4. Testes de autorização obrigatórios
+## 3. Testes de autorização obrigatórios
 
 Usar somente contas e dados sintéticos. Validar cada item por meio de sessão real de cada perfil, não apenas consultas administrativas.
 
@@ -61,7 +50,7 @@ Usar somente contas e dados sintéticos. Validar cada item por meio de sessão r
 
 Os últimos cenários dependem da migração operacional e de testes de integração; ainda não podem passar porque as tabelas clínicas não existem.
 
-## 5. Critérios de liberação
+## 4. Critérios de liberação
 
 Só habilitar os módulos Recepção, Profissional e Sala de espera quando todos os itens forem verdadeiros:
 
@@ -69,7 +58,7 @@ Só habilitar os módulos Recepção, Profissional e Sala de espera quando todos
 - [ ] Migração operacional validada em projeto de teste isolado.
 - [ ] RLS habilitada e forçada em todas as tabelas expostas.
 - [ ] Testes positivos e negativos aprovados para todos os perfis, incluindo usuário inativo e sessão antiga.
-- [ ] Segurança de senhas verificada no Security Advisor.
+- [ ] Limitações do plano documentadas; controles disponíveis revisados no Security Advisor, sem exigir recursos não incluídos no plano.
 - [ ] Origem CORS exata validada no navegador e em preflight.
 - [ ] Convites testados sem exceder limites de Auth.
 - [ ] CI aprovado para o commit final.
@@ -79,6 +68,6 @@ Só habilitar os módulos Recepção, Profissional e Sala de espera quando todos
 ## Estado conhecido na última auditoria
 
 - O schema `public` contém somente `profiles`; os módulos clínicos permanecem bloqueados.
-- O Security Advisor ainda reportava proteção contra senhas comprometidas desativada.
+- A proteção nativa contra senhas comprometidas não está disponível no plano atual e não bloqueia a continuidade.
 - A origem CORS é limitada por padrão a `http://localhost:5173`, a menos que `FAVMED_ALLOWED_ORIGIN` seja configurada no projeto.
 - A documentação não significa que qualquer configuração do Dashboard tenha sido alterada.
