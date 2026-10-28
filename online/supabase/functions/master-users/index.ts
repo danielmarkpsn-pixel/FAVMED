@@ -20,8 +20,30 @@ Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return json({ error: "Método não permitido." }, 405);
 
   const url = Deno.env.get("SUPABASE_URL");
-  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
-  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+  // Modern Supabase keys are injected as JSON dictionaries keyed by key name.
+  // Prefer modern keys; retain legacy fallbacks during the migration window.
+  function readKeySet(variable: string): Record<string, string> {
+    const raw = Deno.env.get(variable);
+    if (!raw) return {};
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+      return Object.fromEntries(
+        Object.entries(parsed).filter((entry): entry is [string, string] =>
+          typeof entry[1] === "string" && entry[1].length > 0
+        ),
+      );
+    } catch {
+      return {};
+    }
+  }
+
+  const publishableKeys = readKeySet("SUPABASE_PUBLISHABLE_KEYS");
+  const secretKeys = readKeySet("SUPABASE_SECRET_KEYS");
+  const anonKey = publishableKeys["default"] || Deno.env.get("SUPABASE_ANON_KEY");
+  const serviceRoleKey = secretKeys["default"] || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
   if (!url || !anonKey || !serviceRoleKey) {
     return json({ error: "Configuração administrativa incompleta." }, 500);
   }
