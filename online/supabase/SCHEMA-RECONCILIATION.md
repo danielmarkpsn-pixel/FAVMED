@@ -17,6 +17,8 @@ Esta auditoria usou consultas somente de leitura ao projeto Supabase. Nenhuma ta
 - A única política encontrada é `profiles_select_own`, para SELECT por usuários autenticados, com condição `auth.uid() = id`.
 - Não foram encontradas políticas de escrita para clientes em `profiles`.
 - A função Edge `master-users` está ativa na versão 3.
+- Auditoria somente de leitura de `auth.users` versus `public.profiles`: 2 contas Auth, 2 perfis correspondentes e 0 contas Auth sem perfil no momento da consulta.
+- Os logs das últimas 24 horas mostraram respostas recentes HTTP 201 (convite criado) e HTTP 200 (operações administrativas), além de respostas HTTP 400/500 anteriores. Os logs agregados não comprovam a entrega de todos os e-mails; o painel de Auth/SMTP ainda é a fonte para investigar limites e entregabilidade.
 - O histórico de migrações do banco lista:
   - `20261028134244 / favmed_profiles_rls`
   - `20261028134308 / secure_rls_auto_enable_function`
