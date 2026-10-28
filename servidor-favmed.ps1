@@ -199,6 +199,12 @@ try {
                 $current = @(ConvertFrom-Json -InputObject $existingJson)
               }
             }
+            # Proteção contra sobrescrita acidental: nenhuma tela pode zerar uma fila
+            # já existente enviando por engano uma lista vazia sem exclusões explícitas.
+            if ($current.Count -gt 0 -and $incoming.Count -eq 0 -and $deletedIds.Count -eq 0) {
+              throw "Salvamento vazio bloqueado: já existem pacientes cadastrados e nenhuma exclusão foi solicitada."
+            }
+
             $deletedSet = @{}
             foreach ($deletedId in $deletedIds) { if (-not [string]::IsNullOrWhiteSpace([string]$deletedId)) { $deletedSet[[string]$deletedId] = $true } }
             $byId = @{}
