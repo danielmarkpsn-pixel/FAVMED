@@ -1,7 +1,12 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 
+// Configure the exact browser origin(s) in Supabase Edge Function secrets.
+// Local default is intentionally limited to the Vite loopback URL; set
+// FAVMED_ALLOWED_ORIGIN to the approved deployed app origin before production.
+const allowedOrigin = (Deno.env.get("FAVMED_ALLOWED_ORIGIN") || "http://localhost:5173").trim();
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": allowedOrigin,
+  "Vary": "Origin",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
@@ -16,6 +21,13 @@ function json(body: unknown, status = 200) {
 }
 
 Deno.serve(async (req: Request) => {
+  const requestOrigin = req.headers.get("Origin");
+  if (requestOrigin && requestOrigin !== allowedOrigin) {
+    return new Response(JSON.stringify({ error: "Origem não autorizada." }), {
+      status: 403,
+      headers: { "Content-Type": "application/json; charset=utf-8", "Vary": "Origin" },
+    });
+  }
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Método não permitido." }, 405);
 
@@ -112,7 +124,38 @@ Deno.serve(async (req: Request) => {
 
     const { data: created, error: createError } = await admin.auth.admin.inviteUserByEmail(email);
     if (createError || !created.user) {
-      return json({ error: "Não foi possível criar a conta. Verifique se o e-mail já está cadastrado." }, 400);
+      const errorText = (createError?.message || "").toLowerCase();
+      const errorCode = String((createError as { code?: string } | null)?.code || "").toLowerCase();
+      const errorStatus = Number((createError as { status?: number } | null)?.status || 0);
+
+      // Do not automatically retry invite sends: Auth email limits are shared
+      // and repeated attempts can extend the cooldown.
+      if (
+        errorStatus === 429 ||
+        errorCode.includes("rate_limit") ||
+        errorText.includes("rate limit") ||
+        errorText.includes("too many requests")
+      ) {
+        return json({
+          error: "Limite de envio de e-mails atingido. Não tente novamente agora. Aguarde o período de liberação do Supabase Auth e confira a configuração SMTP antes de reenviar.",
+          code: "INVITE_RATE_LIMITED",
+        }, 429);
+      }
+
+      if (
+        errorStatus === 422 ||
+        errorCode.includes("already") ||
+        errorText.includes("already been registered") ||
+        errorText.includes("already registered") ||
+        errorText.includes("already exists")
+      ) {
+        return json({
+          error: "Este e-mail já possui uma conta no Supabase Auth. Atualize a lista de usuários e confira o cadastro existente antes de tentar novamente.",
+          code: "INVITE_EMAIL_EXISTS",
+        }, 409);
+      }
+
+      return json({ error: "Não foi possível enviar o convite. Confira se o e-mail já existe e consulte os limites/configuração SMTP do Supabase." }, 400);
     }
 
     const { error: profileError } = await admin.from("profiles").insert({
