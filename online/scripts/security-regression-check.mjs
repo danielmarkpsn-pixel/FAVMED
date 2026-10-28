@@ -19,6 +19,9 @@ assert.match(edge, /INVITE_RATE_LIMITED/);
 assert.match(edge, /INVITE_EMAIL_EXISTS/);
 assert.match(edge, /set_active/);
 assert.match(frontend, /response\.clone\(\)\.json\(\)/);
-assert.match(frontend, /profile\.active !== true/);\n\n// Patient data must never be committed to the legacy local queue file.\nassert.deepEqual(JSON.parse(queueFile), [], 'fila.json must remain empty in the repository; use synthetic fixtures outside tracked production data.');
+assert.match(frontend, /profile\.active !== true/);
+
+// Patient data must never be committed to the legacy local queue file.
+assert.deepEqual(JSON.parse(queueFile), [], 'fila.json must remain empty in the repository; use synthetic fixtures outside tracked production data.');
 
 console.log('Security regression guardrails passed. Live RLS and session-revocation tests remain required.');
