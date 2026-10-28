@@ -1,38 +1,50 @@
-# Provisionar o primeiro Master do FAVMED Online
+# Provisionamento e segurança do FAVMED Online
 
-Este procedimento é manual e deve ser realizado apenas por um responsável autorizado no projeto Supabase de **desenvolvimento**. Não existe senha padrão e o Master não pode ser criado pela interface pública.
+Este documento descreve o estado atual do ambiente de desenvolvimento. O sistema online é exclusivo da Clínica Favmed. Não crie usuários públicos: a gestão de contas deve ser feita pelo Master.
 
-## Pré-requisitos
+## Estado atual verificado
 
-1. Revisar `schema-draft.sql` e aplicar o schema apenas depois da aprovação técnica.
-2. No Supabase Auth, configurar o provedor de e-mail, SMTP e a URL de redirecionamento de desenvolvimento.
-3. Criar manualmente o primeiro usuário em **Authentication → Users** usando o e-mail institucional controlado pelo responsável. Concluir a verificação de e-mail conforme a política configurada.
-4. Copiar o UUID exato desse usuário da tela de Authentication.
+- Projeto Supabase de desenvolvimento: `qzjkoyqmjueosevzhxqa`.
+- A tabela `public.profiles` existe com RLS habilitada e acesso de leitura restrito ao próprio perfil.
+- O perfil Master foi criado manualmente e está ativo.
+- A Edge Function `master-users` está ativa na versão 2.
+- A função está implantada com `verify_jwt = false` porque o gateway JWT legado não valida automaticamente as chaves modernas. Isso **não** significa que os pedidos são aceitos sem autenticação: o código da função valida o token Bearer com Supabase Auth e exige um perfil Master ativo antes das operações administrativas.
+- O CI do GitHub passou no commit `0e46bbd2f1d702b19bcf425f5f000f4ce89d12cf`. O teste de integração real com login e convite ainda precisa ser executado.
 
-## Criar o perfil Master
+## Configuração de autenticação
 
-No SQL Editor do projeto de desenvolvimento, executar o comando abaixo substituindo os valores de exemplo. Não colocar senha, token, chave secreta ou dados de pacientes neste SQL.
+No Supabase, em Authentication → Sign In / Providers → Email:
 
-```sql
-insert into public.profiles (id, display_name, role, active)
-values (
-  'SUBSTITUA-PELO-UUID-REAL-DO-USUARIO'::uuid,
-  'Administrador Favmed',
-  'master',
-  true
-);
-```
+- Manter o cadastro público desativado.
+- Manter logins anônimos desativados.
+- Manter vinculação manual desativada, salvo necessidade futura aprovada.
+- A confirmação de e-mail deve seguir a política definida para o ambiente e o fluxo de convite deve ser testado.
 
-Verifique que o UUID corresponde exatamente ao usuário Auth criado e que existe apenas o Master autorizado. Não execute novamente sem conferir se o perfil já existe.
+O Security Advisor atualmente alerta que a proteção contra senhas comprometidas está desativada. Consulte a [documentação de segurança de senhas do Supabase](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection) e verifique a disponibilidade do recurso no plano do projeto. Não considere essa proteção ativa até que o painel e o Advisor confirmem.
 
-## Antes de disponibilizar
+## Segredos da Edge Function
 
-- Fazer primeiro em projeto de desenvolvimento, nunca diretamente em produção.
-- Confirmar que `public.profiles` tem RLS habilitada e que usuário autenticado só consegue ler o próprio perfil.
-- Implantar a Edge Function `master-users` e configurar os segredos do lado do servidor: `SUPABASE_URL`, `SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY`.
-- Nunca usar `SUPABASE_SERVICE_ROLE_KEY` em variáveis `VITE_*`, no navegador ou no Git.
-- Testar com usuários de cada perfil, e verificar que recepção/profissional/sala recebem HTTP 403 ao chamar operações administrativas.
-- Testar que um usuário bloqueado não consegue iniciar nova sessão. Cada módulo de dados futuros também precisa de políticas RLS que verifiquem o estado ativo do usuário; esconder telas no frontend não é autorização.
-- Confirmar que o convite de novos usuários chega e o link retorna ao endereço autorizado do app.
+A função `master-users` aceita as variáveis modernas do Supabase:
 
-**Estado:** instruções para revisão. Nenhuma migração foi aplicada, nenhum usuário foi criado e nenhum projeto Supabase foi conectado nesta etapa.
+- `SUPABASE_URL`
+- `SUPABASE_PUBLISHABLE_KEYS`: objeto JSON de chaves publicáveis, com a chave padrão em `default`
+- `SUPABASE_SECRET_KEYS`: objeto JSON de chaves secretas, com a chave padrão em `default`
+
+Há fallback para `SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY` legadas, quando fornecidas pelo ambiente. Preferir as variáveis modernas. Chaves secretas nunca podem ser colocadas em variáveis `VITE_*`, no navegador ou no Git. A chave publicável pode ser usada no frontend; a autorização continua dependendo das políticas RLS e da validação no servidor.
+
+## Provisionamento inicial
+
+O primeiro Master é provisionado manualmente por uma pessoa autorizada no Supabase de desenvolvimento. Nunca coloque senha, token ou chave secreta em SQL, código ou commits. Confirme que o UUID do perfil corresponde ao usuário correto em Authentication → Users e não crie um segundo Master sem revisão explícita.
+
+## Antes de disponibilizar o sistema
+
+1. Configurar localmente `online/.env.local` com `VITE_SUPABASE_URL` e `VITE_SUPABASE_PUBLISHABLE_KEY`. Não versionar esse arquivo.
+2. Executar o frontend localmente e testar login do Master, leitura do próprio perfil e logout.
+3. Testar a função `master-users`: listar usuários, convidar um usuário de teste e ativar/desativar esse usuário.
+4. Confirmar que perfis `recepcao`, `profissional` e `sala` recebem HTTP 403 ao tentar operações administrativas.
+5. Verificar logs da função e garantir que erros não exponham tokens, segredos ou dados clínicos.
+6. Confirmar que usuário inativo não consegue autenticar e que futuras tabelas clínicas terão políticas RLS apropriadas. Não depender apenas de controles visuais no frontend.
+7. Restringir CORS ao domínio oficial do aplicativo quando ele estiver definido.
+8. Só depois da validação, configurar o projeto Vercel e seus ambientes.
+
+O sistema ainda não está pronto para produção: os módulos operacionais clínicos e os testes de integração ponta a ponta permanecem pendentes.
