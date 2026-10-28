@@ -1,50 +1,59 @@
 # Provisionamento e segurança do FAVMED Online
 
-Este documento descreve o estado atual do ambiente de desenvolvimento. O sistema online é exclusivo da Clínica Favmed. Não crie usuários públicos: a gestão de contas deve ser feita pelo Master.
+Este documento descreve o ambiente de desenvolvimento e os controles que ainda precisam ser validados. O sistema online é exclusivo da Clínica Favmed. A gestão de contas deve ser feita pelo Master; não habilitar cadastro público.
 
-## Estado atual verificado
+## Estado observado em 2026-10-28
 
 - Projeto Supabase de desenvolvimento: `qzjkoyqmjueosevzhxqa`.
-- A tabela `public.profiles` existe com RLS habilitada e acesso de leitura restrito ao próprio perfil.
-- O perfil Master foi criado manualmente e está ativo.
-- A Edge Function `master-users` está ativa na versão 2.
-- A função está implantada com `verify_jwt = false` porque o gateway JWT legado não valida automaticamente as chaves modernas. Isso **não** significa que os pedidos são aceitos sem autenticação: o código da função valida o token Bearer com Supabase Auth e exige um perfil Master ativo antes das operações administrativas.
-- O CI do GitHub passou no commit `0e46bbd2f1d702b19bcf425f5f000f4ce89d12cf`. O teste de integração real com login e convite ainda precisa ser executado.
+- `public.profiles` existe com RLS habilitada e forçada.
+- A política `profiles_select_own` permite SELECT apenas quando `auth.uid() = id`.
+- A Edge Function `master-users` está ativa na versão 3.
+- A função está implantada com `verify_jwt = false` por compatibilidade com chaves modernas. Isso exige que o código continue validando manualmente o token Bearer via Supabase Auth e verificando o perfil Master ativo em cada operação.
+- O histórico de migrações do banco lista `favmed_profiles_rls`, `secure_rls_auto_enable_function` e `restore_service_role_profiles_privileges`.
+- O repositório versiona somente `20261028160000_restore_service_role_profiles_privileges.sql`; os SQLs históricos não estão todos presentes na pasta de migrações. Não reaplicar nem reconstruir esses SQLs por suposição.
+- A auditoria só encontrou `public.profiles`; tabelas operacionais clínicas não existem no schema `public` verificado.
+- O Security Advisor reporta `auth_leaked_password_protection`: proteção contra senhas comprometidas desativada.
+
+Consulte [SCHEMA-RECONCILIATION.md](SCHEMA-RECONCILIATION.md) para o relatório e o plano de reconciliação.
 
 ## Configuração de autenticação
 
-No Supabase, em Authentication → Sign In / Providers → Email:
+Em Authentication → Sign In / Providers → Email, confirme no painel:
 
-- Manter o cadastro público desativado.
-- Manter logins anônimos desativados.
-- Manter vinculação manual desativada, salvo necessidade futura aprovada.
-- A confirmação de e-mail deve seguir a política definida para o ambiente e o fluxo de convite deve ser testado.
+- Cadastro público desativado.
+- Logins anônimos desativados.
+- Confirmação de e-mail conforme a política aprovada.
+- URLs de redirecionamento limitadas aos ambientes necessários.
+- SMTP personalizado configurado e testado, sem compartilhar credenciais.
 
-O Security Advisor atualmente alerta que a proteção contra senhas comprometidas está desativada. Consulte a [documentação de segurança de senhas do Supabase](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection) e verifique a disponibilidade do recurso no plano do projeto. Não considere essa proteção ativa até que o painel e o Advisor confirmem.
+Ative a proteção contra senhas comprometidas se o recurso estiver disponível no plano/configuração. Confirme a alteração no Security Advisor; não considerar corrigido apenas por ter aberto a configuração.
 
 ## Segredos da Edge Function
 
-A função `master-users` aceita as variáveis modernas do Supabase:
+A função `master-users` aceita as variáveis modernas:
 
 - `SUPABASE_URL`
 - `SUPABASE_PUBLISHABLE_KEYS`: objeto JSON de chaves publicáveis, com a chave padrão em `default`
 - `SUPABASE_SECRET_KEYS`: objeto JSON de chaves secretas, com a chave padrão em `default`
 
-Há fallback para `SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY` legadas, quando fornecidas pelo ambiente. Preferir as variáveis modernas. Chaves secretas nunca podem ser colocadas em variáveis `VITE_*`, no navegador ou no Git. A chave publicável pode ser usada no frontend; a autorização continua dependendo das políticas RLS e da validação no servidor.
+Há fallback para `SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY` legadas, quando fornecidas pelo ambiente. Chaves secretas nunca podem ser colocadas em variáveis `VITE_*`, no navegador ou no Git. Não registrar tokens ou segredos em logs.
 
-## Provisionamento inicial
+## Provisionamento do Master
 
-O primeiro Master é provisionado manualmente por uma pessoa autorizada no Supabase de desenvolvimento. Nunca coloque senha, token ou chave secreta em SQL, código ou commits. Confirme que o UUID do perfil corresponde ao usuário correto em Authentication → Users e não crie um segundo Master sem revisão explícita.
+O Master inicial é provisionado por processo administrativo controlado. Antes de alterar contas, confirme que o UUID do perfil corresponde ao usuário correto em Authentication → Users. Não crie um segundo Master sem revisão explícita.
 
-## Antes de disponibilizar o sistema
+## Plano de validação antes de liberar módulos
 
-1. Configurar localmente `online/.env.local` com `VITE_SUPABASE_URL` e `VITE_SUPABASE_PUBLISHABLE_KEY`. Não versionar esse arquivo.
-2. Executar o frontend localmente e testar login do Master, leitura do próprio perfil e logout.
-3. Testar a função `master-users`: listar usuários, convidar um usuário de teste e ativar/desativar esse usuário.
-4. Confirmar que perfis `recepcao`, `profissional` e `sala` recebem HTTP 403 ao tentar operações administrativas.
-5. Verificar logs da função e garantir que erros não exponham tokens, segredos ou dados clínicos.
-6. Confirmar que usuário inativo não consegue autenticar e que futuras tabelas clínicas terão políticas RLS apropriadas. Não depender apenas de controles visuais no frontend.
-7. Restringir CORS ao domínio oficial do aplicativo quando ele estiver definido.
-8. Só depois da validação, configurar o projeto Vercel e seus ambientes.
+1. Reconciliar o histórico de migrações com SQL confiável e schema real; não modificar migrações históricas já aplicadas.
+2. Testar em ambiente isolado que as migrações são reproduzíveis.
+3. Testar login do Master, leitura do próprio perfil e logout.
+4. Testar listagem, convite, ativação e desativação com contas de teste.
+5. Confirmar HTTP 403 para perfis não-Master em operações administrativas.
+6. Testar políticas RLS usando sessões de usuários de teste distintos, inclusive tentativas de ler/alterar dados alheios.
+7. Testar o comportamento de usuário inativo e o tempo de validade/revogação de sessões existentes.
+8. Implementar novas tabelas operacionais em migrações incrementais, com RLS desde o início.
+9. Garantir que erros e logs não exponham tokens, segredos ou dados clínicos.
+10. Restringir CORS ao domínio oficial quando ele estiver definido.
+11. Somente depois de CI e testes de integração aprovados, planejar implantação da aplicação e liberar módulos.
 
-O sistema ainda não está pronto para produção: os módulos operacionais clínicos e os testes de integração ponta a ponta permanecem pendentes.
+O sistema não está pronto para produção. Não usar dados reais de pacientes nem habilitar recepção, profissional, sala, fila ou atendimentos até que o schema operacional, a autorização e as políticas RLS estejam implantados e testados.
