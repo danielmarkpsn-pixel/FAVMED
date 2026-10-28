@@ -175,15 +175,79 @@ try {
       } elseif ($path -eq "/api/state" -and $method -eq "GET") {
         $responseBytes = [System.IO.File]::ReadAllBytes($DataFile); $type = "application/json; charset=utf-8"
       } elseif ($path -eq "/api/state" -and $method -eq "POST") {
-        if ($contentLength -gt 1048576 -or $read -ne $contentLength) { $status = "413 Payload Too Large"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes("Payload too large") }
+        # Merge por ID: uma tela desatualizada não deve apagar pacientes cadastrados em outra.
+        if ($contentLength -gt 52428800 -or $read -ne $contentLength) { $status = "413 Payload Too Large"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"error":"Fila maior que 50 MB ou requisição incompleta"}'); $type = "application/json; charset=utf-8" }
         else {
           $json = [System.Text.Encoding]::UTF8.GetString($bodyBytes)
+          $tempFile = $null
           try {
-            $parsed = ConvertFrom-Json -InputObject $json
-            if ($parsed -isnot [System.Array] -and $null -ne $parsed) { throw "Expected JSON array" }
-            [System.IO.File]::WriteAllText($DataFile, $json, $Utf8NoBom)
-            $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"ok":true}'); $type = "application/json; charset=utf-8"
-          } catch { $status = "400 Bad Request"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"error":"invalid JSON"}'); $type = "application/json; charset=utf-8" }
+            $trimmedJson = $json.TrimStart()
+            $deletedIds = @()
+            if ($trimmedJson.StartsWith("[")) {
+              $incoming = @(ConvertFrom-Json -InputObject $json)
+            } else {
+              $payload = ConvertFrom-Json -InputObject $json
+              if ($null -eq $payload -or $null -eq $payload.patients) { throw "Expected patient array or payload object" }
+              $incoming = @($payload.patients)
+              if ($null -ne $payload.deletedIds) { $deletedIds = @($payload.deletedIds | ForEach-Object { [string]$_ }) }
+            }
+
+            $current = @()
+            if (Test-Path -LiteralPath $DataFile -PathType Leaf) {
+              $existingJson = [System.IO.File]::ReadAllText($DataFile, [System.Text.Encoding]::UTF8)
+              if (-not [string]::IsNullOrWhiteSpace($existingJson) -and $existingJson.TrimStart().StartsWith("[")) {
+                $current = @(ConvertFrom-Json -InputObject $existingJson)
+              }
+            }
+            $deletedSet = @{}
+            foreach ($deletedId in $deletedIds) { if (-not [string]::IsNullOrWhiteSpace([string]$deletedId)) { $deletedSet[[string]$deletedId] = $true } }
+            $byId = @{}
+            $order = New-Object 'System.Collections.Generic.List[string]'
+            foreach ($p in $current) {
+              $id = [string]$p.id
+              if ([string]::IsNullOrWhiteSpace($id) -or $deletedSet.ContainsKey($id)) { continue }
+              if (-not $byId.ContainsKey($id)) { $order.Add($id) }
+              $byId[$id] = $p
+            }
+            foreach ($p in $incoming) {
+              if ($null -eq $p) { continue }
+              $id = [string]$p.id
+              if ([string]::IsNullOrWhiteSpace($id) -or $deletedSet.ContainsKey($id)) { continue }
+              if ($byId.ContainsKey($id)) {
+                $old = $byId[$id]
+                $record = [ordered]@{}
+                foreach ($prop in $old.PSObject.Properties) { $record[$prop.Name] = $prop.Value }
+                foreach ($prop in $p.PSObject.Properties) {
+                  if ($prop.Name -eq "serviceStates" -and $null -ne $prop.Value) {
+                    $states = [ordered]@{}
+                    if ($null -ne $record["serviceStates"]) {
+                      foreach ($sp in $record["serviceStates"].PSObject.Properties) { $states[$sp.Name] = $sp.Value }
+                    }
+                    foreach ($sp in $prop.Value.PSObject.Properties) { $states[$sp.Name] = $sp.Value }
+                    $record["serviceStates"] = $states
+                  } else { $record[$prop.Name] = $prop.Value }
+                }
+                $byId[$id] = [pscustomobject]$record
+              } else {
+                $byId[$id] = $p
+                $order.Add($id)
+              }
+            }
+            $finalPatients = @()
+            foreach ($id in $order) { if ($byId.ContainsKey($id)) { $finalPatients += $byId[$id] } }
+            $savedJson = ConvertTo-Json -InputObject @($finalPatients) -Depth 50 -Compress
+            $tempFile = $DataFile + ".tmp"
+            [System.IO.File]::WriteAllText($tempFile, $savedJson, $Utf8NoBom)
+            if (Test-Path -LiteralPath $DataFile -PathType Leaf) {
+              [System.IO.File]::Replace($tempFile, $DataFile, $null, $true)
+            } else {
+              [System.IO.File]::Move($tempFile, $DataFile)
+            }
+            $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"ok":true,"count":' + $finalPatients.Count + '}'); $type = "application/json; charset=utf-8"
+          } catch {
+            if ($null -ne $tempFile -and (Test-Path -LiteralPath $tempFile -PathType Leaf)) { Remove-Item -LiteralPath $tempFile -Force -ErrorAction SilentlyContinue }
+            $status = "400 Bad Request"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"error":"invalid JSON or unable to persist queue"}'); $type = "application/json; charset=utf-8"
+          }
         }
       } elseif ($path -eq "/sala" -or $path -eq "/sala/" -or $path -eq "/sala-espera" -or $path -eq "/sala-espera/") {
         $responseBytes = [System.IO.File]::ReadAllBytes((Join-Path $Root "index.html")); $type = "text/html; charset=utf-8"
