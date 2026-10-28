@@ -75,15 +75,11 @@ Deno.serve(async (req: Request) => {
 
   if (body.action === "create_user") {
     const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
-    const password = typeof body.password === "string" ? body.password : "";
     const displayName = typeof body.display_name === "string" ? body.display_name.trim() : "";
     const role = typeof body.role === "string" ? body.role : "";
 
     if (!email || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return json({ error: "Informe um e-mail válido." }, 400);
-    }
-    if (password.length < 12 || password.length > 128) {
-      return json({ error: "A senha inicial deve ter entre 12 e 128 caracteres." }, 400);
     }
     if (!displayName || displayName.length > 120) {
       return json({ error: "Informe um nome entre 1 e 120 caracteres." }, 400);
@@ -92,11 +88,7 @@ Deno.serve(async (req: Request) => {
       return json({ error: "Perfil inválido. O Master inicial não pode ser criado por esta tela." }, 400);
     }
 
-    const { data: created, error: createError } = await admin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: false,
-    });
+    const { data: created, error: createError } = await admin.auth.admin.inviteUserByEmail(email);
     if (createError || !created.user) {
       return json({ error: "Não foi possível criar a conta. Verifique se o e-mail já está cadastrado." }, 400);
     }
