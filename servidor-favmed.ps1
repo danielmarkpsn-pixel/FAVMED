@@ -239,14 +239,17 @@ try {
             $tempFile = $DataFile + ".tmp"
             [System.IO.File]::WriteAllText($tempFile, $savedJson, $Utf8NoBom)
             if (Test-Path -LiteralPath $DataFile -PathType Leaf) {
-              [System.IO.File]::Replace($tempFile, $DataFile, $null, $true)
+              Move-Item -LiteralPath $tempFile -Destination $DataFile -Force
             } else {
               [System.IO.File]::Move($tempFile, $DataFile)
             }
             $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"ok":true,"count":' + $finalPatients.Count + '}'); $type = "application/json; charset=utf-8"
           } catch {
+            $errorMessage = $_.Exception.Message
+            Write-Host ("ERRO ao salvar fila (/api/state): " + $errorMessage) -ForegroundColor Red
             if ($null -ne $tempFile -and (Test-Path -LiteralPath $tempFile -PathType Leaf)) { Remove-Item -LiteralPath $tempFile -Force -ErrorAction SilentlyContinue }
-            $status = "400 Bad Request"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes('{"error":"invalid JSON or unable to persist queue"}'); $type = "application/json; charset=utf-8"
+            $errorJson = @{ error = "Não foi possível salvar a fila"; detail = $errorMessage } | ConvertTo-Json -Compress
+            $status = "500 Internal Server Error"; $responseBytes = [System.Text.Encoding]::UTF8.GetBytes($errorJson); $type = "application/json; charset=utf-8"
           }
         }
       } elseif ($path -eq "/sala" -or $path -eq "/sala/" -or $path -eq "/sala-espera" -or $path -eq "/sala-espera/") {
