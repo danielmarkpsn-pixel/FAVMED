@@ -241,6 +241,12 @@ try {
             }
             $finalPatients = @()
             foreach ($id in $order) { if ($byId.ContainsKey($id)) { $finalPatients += $byId[$id] } }
+            # Proteção adicional: sem exclusões explicitamente solicitadas, uma atualização
+            # nunca pode reduzir a quantidade de pacientes persistidos. Isso evita que
+            # registros com ID ausente/inválido sejam descartados silenciosamente.
+            if ($deletedIds.Count -eq 0 -and $finalPatients.Count -lt $current.Count) {
+              throw ("Salvamento bloqueado: a fila passaria de {0} para {1} pacientes sem exclusões explícitas." -f $current.Count, $finalPatients.Count)
+            }
             $savedJson = ConvertTo-Json -InputObject @($finalPatients) -Depth 50 -Compress
             $tempFile = $DataFile + ".tmp"
             [System.IO.File]::WriteAllText($tempFile, $savedJson, $Utf8NoBom)
