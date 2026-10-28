@@ -16,7 +16,7 @@ Esta auditoria usou consultas somente de leitura ao projeto Supabase. Nenhuma ta
 - Restrição de role: `master`, `recepcao`, `profissional` ou `sala`.
 - A única política encontrada é `profiles_select_own`, para SELECT por usuários autenticados, com condição `auth.uid() = id`.
 - Não foram encontradas políticas de escrita para clientes em `profiles`.
-- A função Edge `master-users` está ativa na versão 3.
+- A função Edge `master-users` foi implantada e verificada na versão 4. O código ativo não contém CORS curinga; rejeita origens diferentes da origem configurada e diferencia limite de convites (429) de e-mail já existente (409). O padrão sem segredo `FAVMED_ALLOWED_ORIGIN` é `http://localhost:5173`, portanto outros endereços de desenvolvimento e a produção exigem configurar a origem exata.
 - Auditoria somente de leitura de `auth.users` versus `public.profiles`: 2 contas Auth, 2 perfis correspondentes e 0 contas Auth sem perfil no momento da consulta.
 - Os logs das últimas 24 horas mostraram respostas recentes HTTP 201 (convite criado) e HTTP 200 (operações administrativas), além de respostas HTTP 400/500 anteriores. Os logs agregados não comprovam a entrega de todos os e-mails; o painel de Auth/SMTP ainda é a fonte para investigar limites e entregabilidade.
 - O histórico de migrações do banco lista:
