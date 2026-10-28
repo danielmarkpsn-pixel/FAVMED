@@ -59,6 +59,17 @@ Deno.serve(async (req: Request) => {
     return json({ error: "Corpo da requisição inválido." }, 400);
   }
 
+  if (body.action === "list_users") {
+    const { data: profiles, error: listError } = await admin
+      .from("profiles")
+      .select("id, display_name, role, active, created_at")
+      .order("created_at", { ascending: false })
+      .limit(200);
+
+    if (listError) return json({ error: "Não foi possível listar as contas." }, 500);
+    return json({ users: profiles ?? [] });
+  }
+
   if (body.action === "create_user") {
     const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
     const password = typeof body.password === "string" ? body.password : "";
