@@ -33,6 +33,10 @@ Nunca coloque chaves secret/service_role no frontend, no arquivo `.env` do Vite 
 - Não há módulos da recepção, profissional ou sala integrados ao banco.
 - Não foi conectado nem modificado nenhum projeto Supabase externo.
 
+## Rascunho de banco
+
+O arquivo `supabase/schema-draft.sql` é apenas uma proposta para revisão. Ele cria a tabela `profiles` com RLS habilitada e permite que cada usuário autenticado leia somente o próprio perfil. Clientes do navegador não recebem permissões de inserir, alterar ou excluir perfis. **Não execute esse SQL em produção sem revisão e testes.** Ele ainda não é uma migração oficial aplicada e não foi executado em nenhum projeto Supabase.
+
 ## Próxima etapa
 
-Preparar e revisar a migração SQL de perfis e permissões, com RLS testada. O primeiro Master deverá ser provisionado por um processo administrativo seguro; jamais por uma conta pública que possa atribuir a si própria o perfil Master.
+Implementar e testar a função administrativa server-side para o Master criar, ativar e bloquear contas, com validação de autorização no servidor e sem expor chaves secret/service_role. O primeiro Master deverá ser provisionado por um processo administrativo seguro; jamais por uma conta pública que possa atribuir a si própria o perfil Master.
