@@ -37,6 +37,8 @@ Nunca coloque chaves secret/service_role no frontend, no arquivo `.env` do Vite 
 
 O arquivo `supabase/schema-draft.sql` é apenas uma proposta para revisão. Ele cria a tabela `profiles` com RLS habilitada e permite que cada usuário autenticado leia somente o próprio perfil. Clientes do navegador não recebem permissões de inserir, alterar ou excluir perfis. **Não execute esse SQL em produção sem revisão e testes.** Ele ainda não é uma migração oficial aplicada e não foi executado em nenhum projeto Supabase.
 
-## Próxima etapa
+## Função administrativa em desenvolvimento
 
-Implementar e testar a função administrativa server-side para o Master criar, ativar e bloquear contas, com validação de autorização no servidor e sem expor chaves secret/service_role. O primeiro Master deverá ser provisionado por um processo administrativo seguro; jamais por uma conta pública que possa atribuir a si própria o perfil Master.
+Foi adicionada a função `supabase/functions/master-users/index.ts`. Ela valida o token com Supabase Auth e confere no banco se o chamador tem perfil `master` ativo antes de criar uma conta (`create_user`) ou ativar/bloquear um perfil comum (`set_active`). Ela não permite criar novos Masters pela interface e impede o Master de bloquear a própria conta. A chave `SUPABASE_SERVICE_ROLE_KEY` é usada somente no ambiente da Edge Function.
+
+**A função ainda não foi implantada nem testada contra um projeto Supabase.** O rascunho SQL também não foi aplicado. Antes de usar, revisar o código, adicionar testes de autorização e abuso, configurar os segredos no ambiente de desenvolvimento e validar com contas de teste. O primeiro Master deverá ser provisionado por um processo administrativo seguro; jamais por uma conta pública que possa atribuir a si própria o perfil Master.
