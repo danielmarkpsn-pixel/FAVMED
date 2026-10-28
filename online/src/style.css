@@ -63,3 +63,48 @@ input:focus { border-color: var(--teal); box-shadow: 0 0 0 3px #087f8c20; }
 .home-card .notice { margin: 22px 0 0; }
 footer { margin-top: 22px; text-align: center; color: #7a8d94; font-size: 11px; }
 @media (max-width: 480px) { .shell { justify-content: flex-start; padding-top: 8vh; } .login-card { border-radius: 17px; } }
+
+
+/* Master administration */
+select {
+  width: 100%;
+  min-height: 47px;
+  padding: 11px 13px;
+  border: 1px solid #cbdadd;
+  border-radius: 10px;
+  color: #20313a;
+  background: #fff;
+  font: inherit;
+}
+select:focus { outline: 3px solid #087f8c20; border-color: var(--teal); }
+.dashboard-shell { justify-content: flex-start; }
+.dashboard-shell .login-card { width: min(100%, 1040px); margin: 12px auto; }
+.admin-panel { margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--line); }
+.admin-panel h2 { margin: 0; font-size: 20px; letter-spacing: -.3px; }
+.admin-panel h3 { margin: 0; font-size: 16px; }
+.admin-panel > .muted { margin-bottom: 18px; }
+.admin-form { max-width: 620px; }
+.admin-form .submit { margin-top: 18px; }
+.users-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 30px 0 12px; }
+.secondary {
+  min-height: 38px; padding: 9px 13px; border: 1px solid #cbdadd; border-radius: 9px;
+  background: #fff; color: #24505b; font: inherit; font-size: 12px; font-weight: 750; cursor: pointer;
+}
+.secondary:hover { background: #f0f8f8; border-color: #8bbdc2; }
+.secondary:disabled { opacity: .6; cursor: wait; }
+.table-wrap { width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; }
+.users-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 12px; }
+.users-table th, .users-table td { padding: 12px; border-bottom: 1px solid #edf1f2; vertical-align: middle; }
+.users-table th { background: #f7fafb; color: #536b74; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; }
+.users-table tr:last-child td { border-bottom: 0; }
+.users-table small { display: inline-block; max-width: 220px; margin-top: 4px; color: #81939a; overflow-wrap: anywhere; font-size: 10px; }
+.status-pill { display: inline-block; border-radius: 999px; padding: 5px 9px; font-weight: 750; white-space: nowrap; }
+.status-pill.active { background: #e1f5ec; color: #176c4b; }
+.status-pill.inactive { background: #fff0ee; color: #a3332b; }
+@media (max-width: 640px) {
+  .dashboard-shell { padding: 12px 8px; }
+  .dashboard-shell .login-card { padding: 20px 14px; }
+  .users-heading { align-items: flex-start; flex-direction: column; }
+  .users-table th, .users-table td { padding: 9px 7px; }
+  .users-table small { max-width: 130px; }
+}
