@@ -6,10 +6,12 @@ on:
       - feature/favmed-online-master-login
     paths:
       - "online/**"
+      - "fila.json"
       - ".github/workflows/favmed-online.yml"
   pull_request:
     paths:
       - "online/**"
+      - "fila.json"
       - ".github/workflows/favmed-online.yml"
   workflow_dispatch:
 
