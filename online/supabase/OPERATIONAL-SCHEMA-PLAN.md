@@ -12,7 +12,7 @@ Preparar a implementação dos módulos de recepção, profissionais, salas, fil
 2. Criar um projeto Supabase de teste isolado para validar migrações, grants, RLS e testes de integração.
 3. Definir e testar autorização por função. Não confiar em role enviada pelo navegador.
 4. Garantir que usuários inativos não consigam executar novas operações; definir e testar o tratamento de sessões já emitidas.
-5. Ativar a proteção contra senhas comprometidas e confirmar a correção no Security Advisor, se disponível no plano.
+5. Documentar limitações do plano Supabase. A proteção nativa contra senhas comprometidas não está disponível no plano atual e não será requisito bloqueante; não solicitar upgrade.
 6. Não usar dados reais de pacientes durante desenvolvimento e testes.
 
 ## Entidades propostas
@@ -57,7 +57,7 @@ Os módulos só podem ser habilitados quando:
 - todos os testes de RLS/autorização passarem;
 - usuário inativo e sessão antiga tiverem comportamento validado;
 - CI estiver verde;
-- não houver bloqueios críticos no Security Advisor;
+- limitações do plano estiverem documentadas e os controles de segurança disponíveis estiverem revisados;
 - a implantação e o rollback estiverem documentados.
 
 ## Estado atual confirmado em 2026-10-28
