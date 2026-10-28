@@ -132,14 +132,12 @@ function renderHome(profile, userId) {
         ${isMaster ? `
           <section class="admin-panel" aria-labelledby="admin-title">
             <h2 id="admin-title">Administração de usuários</h2>
-            <p class="muted">Crie acessos e controle contas da equipe. O perfil Master não pode ser criado nesta tela.</p>
+            <p class="muted">Convide usuários por e-mail e controle contas da equipe. O perfil Master não pode ser criado nesta tela.</p>
             <form id="create-user-form" class="admin-form">
               <label for="new-name">Nome de exibição</label>
               <input id="new-name" name="display_name" required maxlength="120" autocomplete="name" />
               <label for="new-email">E-mail</label>
               <input id="new-email" name="email" type="email" required maxlength="254" autocomplete="email" />
-              <label for="new-password">Senha inicial (mínimo 12 caracteres)</label>
-              <input id="new-password" name="password" type="password" required minlength="12" maxlength="128" autocomplete="new-password" />
               <label for="new-role">Perfil</label>
               <select id="new-role" name="role" required>
                 <option value="recepcao">Recepção</option>
@@ -195,7 +193,7 @@ function renderHome(profile, userId) {
     try {
       await callMasterAction({ action: 'create_user', ...values });
       form.reset();
-      adminMessage.textContent = 'Conta criada com sucesso.';
+      adminMessage.textContent = 'Convite enviado. O usuário deverá concluir o acesso pelo e-mail.';
       await loadUsers();
     } catch (error) {
       adminMessage.textContent = error.message || 'Não foi possível criar a conta.';
