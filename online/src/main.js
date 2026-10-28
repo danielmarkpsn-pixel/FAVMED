@@ -98,6 +98,31 @@ function renderLogin(message = '', isError = false) {
   });
 }
 
+function renderInvitePassword() {
+  root.innerHTML = '<main class="shell"><section class="login-card"><div class="brand-mark" aria-hidden="true">F</div><p class="eyebrow">CLÍNICA FAVMED</p><h1>Concluir seu acesso</h1><p class="muted">Defina uma senha para concluir o convite.</p><form id="invite-password-form"><label for="invite-password">Nova senha</label><input id="invite-password" name="password" type="password" minlength="8" autocomplete="new-password" required><label for="invite-password-confirm">Confirmar nova senha</label><input id="invite-password-confirm" name="confirm_password" type="password" minlength="8" autocomplete="new-password" required><button class="submit" id="invite-submit" type="submit">Salvar senha e concluir</button><p id="invite-message" class="message" role="status"></p></form></section><footer>FAVMED Online · Acesso restrito à Clínica Favmed</footer></main>';
+  const form = document.querySelector('#invite-password-form');
+  const button = document.querySelector('#invite-submit');
+  const status = document.querySelector('#invite-message');
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const values = Object.fromEntries(new FormData(form).entries());
+    const password = String(values.password || '');
+    if (password.length < 8) { status.textContent = 'A senha deve ter pelo menos 8 caracteres.'; status.className = 'message error'; return; }
+    if (password !== String(values.confirm_password || '')) { status.textContent = 'As senhas não coincidem.'; status.className = 'message error'; return; }
+    button.disabled = true; button.textContent = 'Salvando senha…';
+    try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData.session?.user) throw new Error('O convite expirou ou já foi utilizado. Solicite um novo convite ao administrador.');
+      const { error: updateError } = await supabase.auth.updateUser({ password });
+      if (updateError) throw updateError;
+      const user = sessionData.session.user;
+      const { data: profile, error: profileError } = await supabase.from('profiles').select('role, active, display_name').eq('id', user.id).maybeSingle();
+      if (profileError || !profile || profile.active !== true || !roleLabels[profile.role]) { await supabase.auth.signOut(); throw new Error('A conta não possui perfil autorizado ou está inativa. Contate o administrador Master.'); }
+      window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+      renderHome(profile, user.id);
+    } catch (error) { status.textContent = error.message || 'Não foi possível concluir o convite.'; status.className = 'message error'; button.disabled = false; button.textContent = 'Salvar senha e concluir'; }
+  });
+}
 async function callMasterAction(body) {
   const { data, error } = await supabase.functions.invoke('master-users', { body });
   if (error) throw new Error(data?.error || error.message || 'Falha ao comunicar com a função administrativa.');
@@ -229,7 +254,13 @@ function renderHome(profile, userId) {
 
 async function start() {
   if (!configured) return renderSetup();
-  const { data: { session } } = await supabase.auth.getSession();
+  const isInvite = new URLSearchParams(window.location.hash.slice(1)).get('type') === 'invite';
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) return renderLogin('Não foi possível validar o link. Solicite um novo convite ao administrador.', true);
+  if (isInvite) {
+    if (session?.user) return renderInvitePassword();
+    return renderLogin('O convite expirou ou já foi utilizado. Solicite um novo convite ao administrador.', true);
+  }
   if (!session?.user) return renderLogin();
   const { data: profile, error } = await supabase.from('profiles')
     .select('role, active, display_name').eq('id', session.user.id).maybeSingle();
