@@ -23,7 +23,7 @@ Nunca coloque chaves secret/service_role no frontend, em variáveis `VITE_*` ou 
 - Cadastro público não faz parte do fluxo da aplicação.
 - A aplicação exige um registro `profiles` ativo com um dos perfis `master`, `recepcao`, `profissional` ou `sala`.
 - No projeto de desenvolvimento `qzjkoyqmjueosevzhxqa`, `public.profiles` existe, tem RLS habilitada e forçada, e a política de SELECT permite que o usuário autenticado leia somente seu próprio perfil.
-- A Edge Function `master-users` está ativa na versão 3. Ela valida manualmente o token Bearer com Supabase Auth e exige perfil Master ativo antes de operações administrativas.
+- A Edge Function `master-users` está ativa na versão 4. A versão 4 restringe o CORS à origem configurada e retorna erros específicos para limites de convite e e-mails existentes. Sem o segredo `FAVMED_ALLOWED_ORIGIN`, o padrão é `http://localhost:5173`; isso é adequado apenas para desenvolvimento local e deve ser configurado com a origem exata antes de usar outra origem ou publicar. Ela valida manualmente o token Bearer com Supabase Auth e exige perfil Master ativo antes de operações administrativas.
 - A configuração SMTP personalizada foi usada para enviar um convite de teste; isso não comprova, por si só, todos os fluxos de autorização nem a prontidão de produção.
 - O Security Advisor reporta proteção contra senhas comprometidas desativada.
 
