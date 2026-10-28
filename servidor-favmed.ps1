@@ -205,6 +205,28 @@ try {
               throw "Salvamento vazio bloqueado: já existem pacientes cadastrados e nenhuma exclusão foi solicitada."
             }
 
+            # Impede duplicação do mesmo paciente no mesmo dia quando duas recepções
+            # cadastram simultaneamente com IDs diferentes. CPF é a chave de identidade.
+            $existingIds = @{}
+            foreach ($p in $current) {
+              $existingId = [string]$p.id
+              if (-not [string]::IsNullOrWhiteSpace($existingId)) { $existingIds[$existingId] = $true }
+            }
+            foreach ($p in $incoming) {
+              if ($null -eq $p) { continue }
+              $incomingId = [string]$p.id
+              $cpf = ([string]$p.cpf -replace '\D', '')
+              $day = [string]$p.day
+              if ([string]::IsNullOrWhiteSpace($incomingId) -or $existingIds.ContainsKey($incomingId) -or [string]::IsNullOrWhiteSpace($cpf) -or [string]::IsNullOrWhiteSpace($day)) { continue }
+              foreach ($existing in $current) {
+                if ([string]$existing.id -eq $incomingId -or [string]$existing.day -ne $day) { continue }
+                $existingCpf = ([string]$existing.cpf -replace '\D', '')
+                if ($existingCpf -eq $cpf) {
+                  throw ("Cadastro duplicado bloqueado: já existe paciente com este CPF na fila do dia ({0}). Atualize a ficha existente." -f $day)
+                }
+              }
+            }
+
             $deletedSet = @{}
             foreach ($deletedId in $deletedIds) { if (-not [string]::IsNullOrWhiteSpace([string]$deletedId)) { $deletedSet[[string]$deletedId] = $true } }
             $byId = @{}
