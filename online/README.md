@@ -39,6 +39,8 @@ A função `supabase/functions/master-users/index.ts` suporta `create_user` (con
 
 A função está configurada com `verify_jwt = false` para compatibilidade com as chaves modernas. Isso desativa a validação automática do gateway: por isso, o código precisa continuar validando manualmente o token e autorizando apenas um perfil Master ativo. As variáveis modernas são `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEYS` e `SUPABASE_SECRET_KEYS`; as chaves secretas permanecem apenas no ambiente da função. Há fallback para variáveis legadas do Supabase.
 
+O CORS não usa mais curinga (`*`). Configure o segredo `FAVMED_ALLOWED_ORIGIN` na Edge Function com a origem exata da aplicação, incluindo protocolo e porta quando aplicável (por exemplo, `http://localhost:5173` no desenvolvimento). Antes da produção, substitua pelo domínio oficial; não publique com a origem de desenvolvimento. O código responde com erro claro para limites de envio de convite (HTTP 429) e e-mails já cadastrados (HTTP 409). Não fique repetindo convites após um 429: aguarde a liberação do limite e verifique SMTP/limites do Auth.
+
 Consulte [MASTER-BOOTSTRAP.md](supabase/MASTER-BOOTSTRAP.md) e [SCHEMA-RECONCILIATION.md](supabase/SCHEMA-RECONCILIATION.md).
 
 ## Pendências obrigatórias antes de produção
@@ -48,7 +50,8 @@ Consulte [MASTER-BOOTSTRAP.md](supabase/MASTER-BOOTSTRAP.md) e [SCHEMA-RECONCILI
 - Testar login, logout, convite, ativação/desativação e acesso negado para perfis não-Master.
 - Verificar que usuário inativo não consegue autenticar; não depender apenas da interface ou presumir que tokens emitidos anteriormente são revogados imediatamente.
 - Habilitar proteção contra senhas comprometidas, se disponível no projeto, e confirmar no Security Advisor.
-- Restringir CORS ao domínio oficial quando ele estiver definido.
+- Definir `FAVMED_ALLOWED_ORIGIN` para o domínio oficial na Edge Function e confirmar o preflight CORS antes da publicação.
+- Verificar convites com erro 429/409 e revisar manualmente contas Auth sem perfil antes de tentar novamente; não apagar contas automaticamente sem identificar o vínculo e o histórico.
 - Revisar segurança e privacidade antes de usar dados reais de pacientes.
 - Configurar a Vercel somente depois de validar a integração.
 
