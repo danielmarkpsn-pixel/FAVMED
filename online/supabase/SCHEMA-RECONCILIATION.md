@@ -24,6 +24,7 @@ Esta auditoria usou consultas somente de leitura ao projeto Supabase. Nenhuma ta
   - `20261028134308 / secure_rls_auto_enable_function`
   - `20261028154747 / restore_service_role_profiles_privileges`
 - O repositório contém atualmente apenas `20261028160000_restore_service_role_profiles_privileges.sql` na pasta `online/supabase/migrations`. Portanto, o histórico SQL do banco não é reproduzido integralmente pelo Git.
+- A busca pelo SQL histórico exato também foi feita no histórico de commits e nas árvores das branches acessíveis (`main` e branches de funcionalidades revisadas); os três arquivos históricos registrados pelo Supabase não foram encontrados nesses locais. Não é seguro reconstruir seu conteúdo por suposição.
 
 ## Conclusão
 
@@ -48,6 +49,10 @@ O schema atual é somente a base de autenticação/perfis. Não há ainda tabela
 - Confirmar que segredos administrativos nunca são entregues ao frontend.
 - Configurar CORS para o domínio de produção somente quando ele for definido.
 - Fazer testes de RLS com usuários de teste distintos; uma consulta administrativa executada com privilégios elevados não substitui esses testes.
+
+## Aviso adicional sobre dados no Git
+
+O arquivo legado `fila.json` foi esvaziado na branch `feature/favmed-online-master-login`, e o CI agora bloqueia a inclusão de registros nesse arquivo nessa branch. Isso **não apaga versões anteriores do histórico Git**, nem altera `main` ou outras branches. A limpeza do histórico remoto, caso necessária, exige uma operação coordenada de reescrita de histórico e verificação de todas as referências; não foi executada para preservar `main` e evitar alterações destrutivas não autorizadas.
 
 ## Regra de liberação
 
