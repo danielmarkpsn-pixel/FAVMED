@@ -574,6 +574,8 @@ async function renderOperationalModules(profile, userId) {
     const editPatientButton = event.target.closest('.edit-patient-button');
     const repeatCallButton = event.target.closest('.repeat-call-button');
     const cancelCallButton = event.target.closest('.cancel-call-button');
+    const repeatExamCallButton = event.target.closest('.repeat-exam-call-button');
+    const cancelExamCallButton = event.target.closest('.cancel-exam-call-button');
     if (sheetButton) {
       const patient = lastPatientsById.get(sheetButton.dataset.patientId);
       if (!patient) return;
@@ -701,6 +703,27 @@ async function renderOperationalModules(profile, userId) {
         if (error) throw error;
         operationalMessage('#operational-message', 'Chamada cancelada.');
         await loadOperationalRows();
+      } else if (repeatExamCallButton) {
+        repeatExamCallButton.disabled = true;
+        const { error } = await supabase.from('visit_exams').update({ updated_at: new Date().toISOString() }).eq('id', repeatExamCallButton.dataset.examId).eq('status', 'chamado');
+        if (error) throw error;
+        operationalMessage('#operational-message', 'Chamada do exame repetida.');
+        await loadOperationalRows();
+      } else if (cancelExamCallButton) {
+        cancelExamCallButton.disabled = true;
+        const { data: examRecord, error: examRecordError } = await supabase.from('visit_exams').select('visit_id').eq('id', cancelExamCallButton.dataset.examId).single();
+        if (examRecordError) throw examRecordError;
+        const { error } = await supabase.from('visit_exams').update({ status: 'pendente' }).eq('id', cancelExamCallButton.dataset.examId).eq('status', 'chamado');
+        if (error) throw error;
+        const { data: siblingExams, error: siblingError } = await supabase.from('visit_exams').select('status').eq('visit_id', examRecord.visit_id);
+        if (siblingError) throw siblingError;
+        const visitStatus = siblingExams?.some((item) => item.status === 'em_atendimento') ? 'em_atendimento'
+          : siblingExams?.some((item) => item.status === 'chamado') ? 'chamado'
+          : siblingExams?.length && siblingExams.every((item) => item.status === 'realizado') ? 'atendido' : 'aguardando';
+        const { error: visitUpdateError } = await supabase.from('patient_visits').update({ status: visitStatus }).eq('id', examRecord.visit_id);
+        if (visitUpdateError) throw visitUpdateError;
+        operationalMessage('#operational-message', 'Chamada do exame cancelada.');
+        await loadOperationalRows();
       } else if (priorityButton) {
         priorityButton.disabled = true;
         const { error } = await supabase.from('patient_visits').update({ priority: priorityButton.dataset.nextPriority === 'true' }).eq('id', priorityButton.dataset.visitId);
@@ -723,6 +746,8 @@ async function renderOperationalModules(profile, userId) {
       if (asoButton) asoButton.disabled = false;
       if (repeatCallButton) repeatCallButton.disabled = false;
       if (cancelCallButton) cancelCallButton.disabled = false;
+      if (repeatExamCallButton) repeatExamCallButton.disabled = false;
+      if (cancelExamCallButton) cancelExamCallButton.disabled = false;
     }
   });
   await loadOperationalRows();
