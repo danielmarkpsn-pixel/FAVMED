@@ -76,3 +76,17 @@ assert.match(publicWaitingMigration, /revoke all on public\.public_waiting_room_
 assert.match(publicWaitingMigration, /v\.status = 'em_atendimento'/);
 const publicWaitingColumns = publicWaitingMigration.split('as\nselect')[1]?.split('\nfrom public.patient_visits')[0] || '';
 assert.doesNotMatch(publicWaitingColumns, /cpf|birth_date|company_name|exam_name/i);
+
+const calledStatusMigration = await readFile(new URL('../supabase/migrations/20261029202000_visit_called_status.sql', import.meta.url), 'utf8');
+assert.match(calledStatusMigration, /'chamado'/);
+assert.match(calledStatusMigration, /v\.status = 'chamado'/);
+const receptionWorkflowMigration = await readFile(new URL('../supabase/migrations/20261029203000_reception_workflow_fields.sql', import.meta.url), 'utf8');
+assert.match(receptionWorkflowMigration, /add column if not exists priority boolean/);
+assert.match(receptionWorkflowMigration, /add column if not exists aso_pending boolean/);
+assert.match(receptionWorkflowMigration, /guard_reception_visit_flags/);
+assert.match(receptionWorkflowMigration, /current_active_role\(\) not in \('master', 'recepcao'\)/);
+assert.match(frontend, /edit-patient-button/);
+assert.match(frontend, /patient-sheet-dialog/);
+assert.match(frontend, /examCatalog/);
+assert.match(frontend, /priority-toggle-button/);
+assert.match(frontend, /aso-toggle-button/);
