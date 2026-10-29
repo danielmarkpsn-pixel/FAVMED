@@ -14,7 +14,7 @@ assert.doesNotMatch(edge, /Access-Control-Allow-Origin["']?\s*:\s*["']\*["']/);
 assert.match(edge, /requestOrigin !== allowedOrigin/);
 assert.match(edge, /auth\.getUser\(token\)/);
 assert.match(edge, /caller\.role !== "master" \|\| caller\.active !== true/);
-assert.match(edge, /new Set\(\["recepcao", "profissional", "sala"\]\)/);
+assert.match(edge, /new Set\(\["recepcao", "profissional"\]\)/);
 assert.match(edge, /INVITE_RATE_LIMITED/);
 assert.match(edge, /INVITE_EMAIL_EXISTS/);
 assert.match(edge, /set_active/);
