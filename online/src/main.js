@@ -464,7 +464,6 @@ async function renderOperationalModules(profile, userId) {
         const nextStatus = examButton.dataset.nextStatus;
         const payload = { status: nextStatus, updated_at: new Date().toISOString() };
         if (nextStatus === 'realizado') {
-          payload.completed_at = new Date().toISOString();
         }
         const { error } = await supabase.from('visit_exams').update(payload).eq('id', examButton.dataset.examId);
         if (error) throw error;
