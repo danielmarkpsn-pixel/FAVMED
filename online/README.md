@@ -38,6 +38,7 @@ O histórico remoto contém migrações antigas cujos SQLs iniciais não estão 
 - `20261029203000_reception_workflow_fields.sql`: adiciona convênio, função, prioridade e flags de ASO; um gatilho impede profissionais de alterar prioridade ou status do ASO.
 - `20261029204000_patient_documents_storage.sql`: configura bucket privado para PDFs, com limite de 10 MB e políticas de leitura/gravação por perfil.
 - `20261029205000_visit_exam_called_status.sql`: habilita chamada por exame individual e publica somente a chamada ativa, com sala e nome abreviado.
+- `20261029206000_public_calls_without_exams.sql`: mantém chamadas visíveis mesmo quando um atendimento não possui exames individualizados.
 
 ## Segurança e integridade
 
