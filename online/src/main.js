@@ -429,7 +429,7 @@ async function renderOperationalModules(profile, userId) {
         operationalMessage('#checkin-message', 'O CPF deve conter exatamente 11 números.', true);
         return;
       }
-      const examNames = [...new Set([...form.querySelectorAll('input[name="exam_names"]:checked')].map((input) => input.value.trim()).concat(String(values.other_exam_names || '').split(/[\\n,;]/).map((name) => name.trim()).filter(Boolean)))];
+      const examNames = [...new Set([...form.querySelectorAll('input[name="exam_names"]:checked')].map((input) => input.value.trim()).concat(String(values.other_exam_names || '').split(/[\n,;]/).map((name) => name.trim()).filter(Boolean)))];
       button.disabled = true;
       button.textContent = 'Salvando cadastro…';
       operationalMessage('#checkin-message', '');
