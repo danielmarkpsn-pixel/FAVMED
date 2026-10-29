@@ -30,6 +30,7 @@ O histórico remoto contém migrações antigas cujos SQLs iniciais não estão 
 
 - `20261028160000_restore_service_role_profiles_privileges.sql`: restaura privilégios de `service_role` em `public.profiles`.
 - `20261029150000_operational_foundation.sql`: cria a base operacional, restrições, índices, políticas RLS, grants por coluna e gatilhos para atualização de timestamps e conclusão de exames.
+- `20261029195000_visit_timestamp_integrity.sql`: reforça os campos de auditoria e faz o banco controlar os horários de início/conclusão do atendimento.
 
 ## Segurança e integridade
 
