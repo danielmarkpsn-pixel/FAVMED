@@ -10,7 +10,7 @@ create or replace function private.current_active_role()
 returns text
 language sql
 stable
-security invoker
+security definer
 set search_path = pg_catalog, public
 as $$
   select p.role
@@ -290,12 +290,52 @@ create policy visit_exams_delete_master on public.visit_exams
 for delete to authenticated
 using (private.current_active_role() = 'master');
 
+
+drop policy if exists visit_exams_update_room on public.visit_exams;
+create policy visit_exams_update_room on public.visit_exams
+for update to authenticated
+using (
+  private.current_active_role() = 'sala'
+  and exists (
+    select 1 from public.rooms r
+    where r.id = visit_exams.room_id
+      and r.assigned_profile_id = (select auth.uid())
+      and r.active is true
+  )
+)
+with check (
+  private.current_active_role() = 'sala'
+  and exists (
+    select 1 from public.rooms r
+    where r.id = visit_exams.room_id
+      and r.assigned_profile_id = (select auth.uid())
+      and r.active is true
+  )
+);
+
 -- Explicit grants: RLS remains the row-level authorization boundary.
-grant select, insert, update, delete on public.patients to authenticated;
-grant select, insert, update, delete on public.professionals to authenticated;
-grant select, insert, update, delete on public.rooms to authenticated;
-grant select, insert, update, delete on public.patient_visits to authenticated;
-grant select, insert, update, delete on public.visit_exams to authenticated;
+
+
+-- Reception/Master may read only active professional names for assignment.
+-- The role helper can return only the caller's own active role.
+create policy profiles_select_professional_directory on public.profiles
+for select to authenticated
+using (
+  private.current_active_role() in ('master', 'recepcao')
+  and role = 'profissional'
+  and active is true
+);
+
+grant select, insert, delete on public.patients to authenticated;
+grant update (full_name, cpf, birth_date, sex, phone, email, company_name, notes, updated_at) on public.patients to authenticated;
+grant select, insert, delete on public.professionals to authenticated;
+grant update (specialty, registration_number, active, updated_at) on public.professionals to authenticated;
+grant select, insert, delete on public.rooms to authenticated;
+grant update (name, room_type, assigned_profile_id, active, display_order, updated_at) on public.rooms to authenticated;
+grant select, insert, delete on public.patient_visits to authenticated;
+grant update (visit_date, attendance_type, status, company_name, professional_id, room_id, started_at, completed_at, updated_at) on public.patient_visits to authenticated;
+grant select, insert, delete on public.visit_exams to authenticated;
+grant update (status, result_summary, completed_by, completed_at, display_order, updated_at) on public.visit_exams to authenticated;
 
 
 -- Keep timestamps current even when a client does not send updated_at.
