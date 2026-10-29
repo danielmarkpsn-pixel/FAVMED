@@ -107,3 +107,8 @@ assert.match(examCallMigration, /join public\.visit_exams e/);
 assert.match(frontend, /repeat-exam-call-button/);
 assert.match(frontend, /cancel-exam-call-button/);
 assert.match(frontend, /data-next-status="chamado"/);
+
+const publicCallsFallbackMigration = await readFile(new URL('../supabase/migrations/20261029206000_public_calls_without_exams.sql', import.meta.url), 'utf8');
+assert.match(publicCallsFallbackMigration, /union all/i);
+assert.match(publicCallsFallbackMigration, /not exists \(select 1 from public\.visit_exams/);
+assert.match(publicCallsFallbackMigration, /grant select on public\.public_waiting_room_calls to anon/);
