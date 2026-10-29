@@ -242,6 +242,22 @@ async function renderOperationalModules(profile, userId) {
           <p id="checkin-message" class="message" role="status"></p>
         </form>
       </section>` : ''}
+
+    ${profile.role === 'master' ? `
+      <section class="module-card">
+        <h3>Master · Configurar salas</h3>
+        <p class="muted">Crie as salas e associe cada conta do perfil Sala de espera à sua sala.</p>
+        <form id="room-setup-form" class="operational-form">
+          <div class="form-grid">
+            <div><label for="room-name">Nome da sala *</label><input id="room-name" name="name" required maxlength="80" placeholder="Ex.: Audiometria"></div>
+            <div><label for="room-type">Tipo</label><select id="room-type" name="room_type"><option value="exame">Exame</option><option value="consulta">Consulta</option><option value="recepcao">Recepção</option><option value="espera">Espera</option><option value="outro">Outro</option></select></div>
+            <div><label for="room-assigned-profile">Conta vinculada</label><select id="room-assigned-profile" name="assigned_profile_id"><option value="">Sem vínculo</option></select></div>
+          </div>
+          <button class="submit" id="room-create-submit" type="submit">Salvar sala</button>
+          <p id="room-setup-message" class="message" role="status"></p>
+        </form>
+        <div class="table-wrap"><table class="users-table"><thead><tr><th>Sala</th><th>Tipo</th><th>Conta vinculada</th><th>Status</th></tr></thead><tbody id="room-list-rows"><tr><td colspan="4">Carregando salas…</td></tr></tbody></table></div>
+      </section>` : ''}
     <section class="module-card">
       <div class="users-heading"><h3>${profile.role === 'sala' ? 'Exames desta sala' : profile.role === 'profissional' ? 'Minha fila de atendimentos' : 'Fila e atendimentos'}</h3><span class="muted" id="operational-count"></span></div>
       <div class="table-wrap"><table class="users-table operational-table">
@@ -253,6 +269,46 @@ async function renderOperationalModules(profile, userId) {
 
   const professionalSelect = document.querySelector('#visit-professional');
   const roomSelect = document.querySelector('#visit-room');
+  const roomAssignedSelect = document.querySelector('#room-assigned-profile');
+  if (roomAssignedSelect) {
+    const { data: roomUsers, error: roomUsersError } = await supabase.from('profiles')
+      .select('id, display_name').eq('role', 'sala').eq('active', true).order('display_name');
+    if (!roomUsersError) {
+      roomAssignedSelect.innerHTML = '<option value="">Sem vínculo</option>' + (roomUsers || []).map((u) => `<option value="${escapeHtml(u.id)}">${escapeHtml(u.display_name || 'Sala de espera')}</option>`).join('');
+    }
+  }
+  if (profile.role === 'master') {
+    const { data: savedRooms, error: savedRoomsError } = await supabase.from('rooms')
+      .select('id, name, room_type, assigned_profile_id, active').order('display_order').order('name');
+    const roomRows = document.querySelector('#room-list-rows');
+    if (roomRows) roomRows.innerHTML = savedRoomsError
+      ? '<tr><td colspan="4">Não foi possível carregar as salas.</td></tr>'
+      : (savedRooms || []).map((room) => {
+        const assigned = (roomUsers || []).find((u) => u.id === room.assigned_profile_id);
+        return `<tr><td>${escapeHtml(room.name)}</td><td>${escapeHtml(room.room_type)}</td><td>${escapeHtml(assigned?.display_name || (room.assigned_profile_id ? 'Conta vinculada' : 'Sem vínculo'))}</td><td><span class="status-pill ${room.active ? 'active' : 'inactive'}">${room.active ? 'Ativa' : 'Inativa'}</span></td></tr>`;
+      }).join('') || '<tr><td colspan="4">Nenhuma sala cadastrada.</td></tr>';
+    const roomForm = document.querySelector('#room-setup-form');
+    roomForm?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const button = document.querySelector('#room-create-submit');
+      const values = Object.fromEntries(new FormData(form).entries());
+      button.disabled = true;
+      try {
+        const { error } = await supabase.from('rooms').insert({
+          name: String(values.name || '').trim(),
+          room_type: values.room_type,
+          assigned_profile_id: values.assigned_profile_id || null,
+        });
+        if (error) throw error;
+        operationalMessage('#room-setup-message', 'Sala cadastrada.');
+        await renderOperationalModules(profile, userId);
+      } catch (error) {
+        operationalMessage('#room-setup-message', error.message || 'Não foi possível cadastrar a sala.', true);
+        button.disabled = false;
+      }
+    });
+  }
   const [professionalResult, roomResult] = await Promise.all([
     supabase.from('profiles').select('id, display_name').eq('role', 'profissional').eq('active', true).order('display_name'),
     supabase.from('rooms').select('id, name').eq('active', true).order('display_order').order('name'),
