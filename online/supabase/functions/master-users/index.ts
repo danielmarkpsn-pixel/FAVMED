@@ -11,7 +11,7 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const allowedRoles = new Set(["recepcao", "profissional", "sala"]);
+const allowedRoles = new Set(["recepcao", "profissional"]);
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
