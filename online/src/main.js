@@ -463,8 +463,6 @@ async function renderOperationalModules(profile, userId) {
         examButton.disabled = true;
         const nextStatus = examButton.dataset.nextStatus;
         const payload = { status: nextStatus, updated_at: new Date().toISOString() };
-        if (nextStatus === 'realizado') {
-        }
         const { error } = await supabase.from('visit_exams').update(payload).eq('id', examButton.dataset.examId);
         if (error) throw error;
         operationalMessage('#operational-message', 'Status do exame atualizado.');
@@ -473,8 +471,6 @@ async function renderOperationalModules(profile, userId) {
         visitButton.disabled = true;
         const nextStatus = visitButton.dataset.nextStatus;
         const payload = { status: nextStatus, updated_at: new Date().toISOString() };
-        if (nextStatus === 'em_atendimento') payload.started_at = new Date().toISOString();
-        if (nextStatus === 'atendido') payload.completed_at = new Date().toISOString();
         const { error } = await supabase.from('patient_visits').update(payload).eq('id', visitButton.dataset.visitId);
         if (error) throw error;
         operationalMessage('#operational-message', 'Status do atendimento atualizado.');
