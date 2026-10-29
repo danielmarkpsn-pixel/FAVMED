@@ -90,3 +90,12 @@ assert.match(frontend, /patient-sheet-dialog/);
 assert.match(frontend, /examCatalog/);
 assert.match(frontend, /priority-toggle-button/);
 assert.match(frontend, /aso-toggle-button/);
+
+const patientDocumentsMigration = await readFile(new URL('../supabase/migrations/20261029204000_patient_documents_storage.sql', import.meta.url), 'utf8');
+assert.match(patientDocumentsMigration, /values \('patient-documents', 'patient-documents', false/);
+assert.match(patientDocumentsMigration, /file_size_limit/);
+assert.match(patientDocumentsMigration, /create policy patient_documents_read_authorized/);
+assert.match(patientDocumentsMigration, /current_active_role\(\) in \('master', 'recepcao'\)/);
+assert.match(frontend, /storage\.from\('patient-documents'\)\.upload/);
+assert.match(frontend, /createSignedUrl\(patient\.document_path, 300\)/);
+assert.match(frontend, /backup-operational-json/);
