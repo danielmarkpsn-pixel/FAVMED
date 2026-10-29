@@ -216,6 +216,7 @@ const examCatalog = {
   'Sala 4': ['EEG', 'ECG', 'Espirometria', 'Acuidade', 'Acuidade com percepção de cores', 'Av Psico', 'Mapa 24h', 'Holter 24h', 'Risco Cirúrgico'],
 };
 const defaultExams = [...new Set(Object.values(examCatalog).flat().concat(['ASO']))];
+const todayLocal = () => { const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`; };
 
 function operationalMessage(target, message, isError = false) {
   const node = document.querySelector(target);
@@ -356,6 +357,7 @@ async function renderOperationalModules(profile, userId) {
     rows.innerHTML = '<tr><td colspan="4">Carregando dados…</td></tr>';
     let visitsQuery = supabase.from('patient_visits')
       .select('id, patient_id, visit_date, attendance_type, status, professional_id, room_id, checked_in_at, priority, aso_pending, aso_completed')
+      .eq('visit_date', todayLocal())
       .order('checked_in_at', { ascending: false }).limit(100);
     let assignedRoomId = '';
     if (profile.role === 'profissional') visitsQuery = visitsQuery.eq('professional_id', userId);
@@ -380,7 +382,7 @@ async function renderOperationalModules(profile, userId) {
       if (visitIds.length) {
         const { data, error } = await supabase.from('patient_visits')
           .select('id, patient_id, visit_date, attendance_type, status, checked_in_at')
-          .in('id', visitIds).order('checked_in_at', { ascending: false });
+          .in('id', visitIds).eq('visit_date', todayLocal()).order('checked_in_at', { ascending: false });
         if (error) { rows.innerHTML = '<tr><td colspan="4">Não foi possível carregar a fila desta sala.</td></tr>'; return; }
         visits = data || [];
       }
