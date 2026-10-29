@@ -120,6 +120,9 @@ function renderLogin(message = '', isError = false) {
         await supabase.auth.signOut();
         throw new Error('A conta não possui perfil autorizado ou está inativa. Contate o administrador Master.');
       }
+      const homePath = ({ master: '/master', recepcao: '/recepcao', profissional: '/profissional', sala: '/sala' })[profile.role];
+      window.history.replaceState({}, document.title, homePath);
+      if (profile.role === 'sala') return renderPublicWaitingRoom();
       renderHome(profile, data.user.id);
     } catch (error) {
       status.textContent = error.message || 'Falha ao validar o acesso.';
@@ -259,9 +262,9 @@ async function renderOperationalModules(profile, userId) {
         </form>
       </section>` : ''}
 
-    ${profile.role === 'master' ? `
+    ${profile.role === 'recepcao' ? `
       <section class="module-card">
-        <h3>Master · Configurar salas</h3>
+        <h3>Recepção · Configurar salas e exames</h3>
         <p class="muted">Crie as salas e associe cada conta do perfil Sala de espera à sua sala.</p>
         <form id="room-setup-form" class="operational-form">
           <div class="form-grid">
@@ -295,7 +298,7 @@ async function renderOperationalModules(profile, userId) {
       roomAssignedSelect.innerHTML = '<option value="">Sem vínculo</option>' + roomUsers.map((u) => `<option value="${escapeHtml(u.id)}">${escapeHtml(u.display_name || 'Sala de espera')}</option>`).join('');
     }
   }
-  if (profile.role === 'master') {
+  if (profile.role === 'recepcao') {
     const { data: savedRooms, error: savedRoomsError } = await supabase.from('rooms')
       .select('id, name, room_type, assigned_profile_id, active').order('display_order').order('name');
     const roomRows = document.querySelector('#room-list-rows');
@@ -504,6 +507,8 @@ async function renderOperationalModules(profile, userId) {
 function renderHome(profile, userId) {
   const label = roleLabels[profile.role];
   const isMaster = profile.role === 'master';
+  const requiredPath = ({ master: '/master', recepcao: '/recepcao', profissional: '/profissional', sala: '/sala' })[profile.role];
+  if (window.location.pathname !== requiredPath) window.history.replaceState({}, document.title, requiredPath);
   root.innerHTML = `
     <main class="shell dashboard-shell">
       <section class="login-card home-card">
@@ -540,7 +545,7 @@ function renderHome(profile, userId) {
               <tbody id="users-body"><tr><td colspan="4">Carregando contas…</td></tr></tbody>
             </table></div>
           </section>` : ``}
-        <section id="operational-panel" class="operational-panel" aria-label="Módulos operacionais"></section>
+        ${isMaster ? '' : '<section id="operational-panel" class="operational-panel" aria-label="Módulo operacional"></section>'}
         <button class="secondary" id="sign-out" type="button">Sair da conta</button>
       </section>
       <footer>FAVMED Online · Acesso restrito à Clínica Favmed</footer>
@@ -551,8 +556,7 @@ function renderHome(profile, userId) {
     renderLogin('Você saiu da sua conta.');
   });
 
-  renderOperationalModules(profile, userId);
-  if (!isMaster) return;
+  if (!isMaster) { renderOperationalModules(profile, userId); return; }
   const adminMessage = document.querySelector('#admin-message');
   const usersBody = document.querySelector('#users-body');
   const refreshButton = document.querySelector('#refresh-users');
@@ -615,8 +619,25 @@ function renderHome(profile, userId) {
   loadUsers();
 }
 
+async function renderPublicWaitingRoom() {
+  root.innerHTML = `
+    <main class="waiting-screen">
+      <header class="waiting-brand"><img class="brand-logo" src="${logoFavmed}" alt="Clínica Favmed"/><div><h1>Clínica Favmed</h1><p>PAINEL DE CHAMADAS</p></div><span class="public-live"><i></i> AO VIVO</span></header>
+      <section class="waiting-content"><p class="eyebrow">ATENÇÃO</p><h2>Paciente chamado</h2><div id="public-calls" class="public-calls"><p class="muted">Carregando chamadas…</p></div><p class="waiting-note">Aguarde a chamada da recepção ou do profissional.</p></section>
+    </main>`;
+  const calls = document.querySelector('#public-calls');
+  async function refreshCalls() {
+    const { data, error } = await supabase.from('public_waiting_room_calls').select('call_id, display_name, room_name, called_at').order('called_at', { ascending: false }).limit(5);
+    if (error) { calls.innerHTML = '<p class="muted">Painel temporariamente indisponível. Solicite ajuda à recepção.</p>'; return; }
+    calls.innerHTML = data?.length ? data.map((call, index) => `<article class="call-card ${index === 0 ? 'current-call' : ''}"><div><span class="call-label">${index === 0 ? 'CHAMADA ATUAL' : 'CHAMADA RECENTE'}</span><h3>${escapeHtml(call.display_name)}</h3></div><div class="call-room"><span>DIRIJA-SE À</span><strong>${escapeHtml(call.room_name || 'Recepção')}</strong></div></article>`).join('') : '<div class="no-calls"><h3>Nenhuma chamada no momento</h3><p>Por favor, aguarde.</p></div>';
+  }
+  await refreshCalls();
+  window.setInterval(refreshCalls, 5000);
+}
+
 async function start() {
   if (!configured) return renderSetup();
+  if (window.location.pathname === '/sala') return renderPublicWaitingRoom();
   // Supabase may return the flow type in the URL hash (implicit flow)
   // or the query string (depending on the email template / redirect setup).
   // Capture it before deciding whether an authenticated session may reach the panel.
@@ -641,6 +662,9 @@ async function start() {
     await supabase.auth.signOut();
     return renderLogin('A conta não possui perfil autorizado ou está inativa.', true);
   }
+  if (profile.role === 'sala') return renderPublicWaitingRoom();
+  const homePath = ({ master: '/master', recepcao: '/recepcao', profissional: '/profissional' })[profile.role];
+  if (homePath && window.location.pathname === '/') window.history.replaceState({}, document.title, homePath);
   renderHome(profile, session.user.id);
 }
 
