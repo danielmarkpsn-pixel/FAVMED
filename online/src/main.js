@@ -514,9 +514,9 @@ async function renderOperationalModules(profile, userId) {
   document.querySelector('#operational-search').addEventListener('input', () => loadOperationalRows());
   professionalRoomFilter?.addEventListener('change', () => loadOperationalRows());
   document.querySelector('#export-operational-csv').addEventListener('click', () => {
-    const tableRows = [...document.querySelectorAll('#operational-rows tr')].map((tr) => [...tr.cells].map((cell) => cell.innerText.replace(/\\s+/g, ' ').trim()));
-    const csv = tableRows.map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(',')).join('\\r\\n');
-    const url = URL.createObjectURL(new Blob(['\\ufeff', csv], { type: 'text/csv;charset=utf-8;' }));
+    const tableRows = [...document.querySelectorAll('#operational-rows tr')].map((tr) => [...tr.cells].map((cell) => cell.innerText.replace(/\s+/g, ' ').trim()));
+    const csv = tableRows.map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+    const url = URL.createObjectURL(new Blob(['\ufeff', csv], { type: 'text/csv;charset=utf-8;' }));
     const link = document.createElement('a'); link.href = url; link.download = `favmed-atendimentos-${new Date().toISOString().slice(0, 10)}.csv`; link.click(); URL.revokeObjectURL(url);
   });
   document.querySelector('#operational-rows').addEventListener('click', async (event) => {
