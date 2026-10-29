@@ -238,3 +238,9 @@ textarea:focus { outline: 3px solid #087f8c20; border-color: var(--teal); }
 .patient-sheet-dialog dd { margin: 0; overflow-wrap: anywhere; }
 .patient-sheet-dialog form { display: flex; justify-content: flex-end; }
 @media (max-width: 520px) { .patient-sheet-dialog dl { grid-template-columns: 1fr; gap: 3px; } .patient-sheet-dialog dd { margin-bottom: 10px; } }
+
+.patient-edit-dialog form > label { display: block; margin: 12px 0 5px; color: var(--muted); font-size: 12px; font-weight: 750; }
+.patient-edit-dialog form > input, .patient-edit-dialog form > textarea { width: 100%; min-width: 0; margin-bottom: 6px; }
+.patient-edit-dialog .submit { width: 100%; margin-top: 12px; }
+.patient-edit-dialog .users-heading { align-items: center; gap: 10px; }
+.patient-edit-dialog .users-heading h2 { font-size: 20px; }
