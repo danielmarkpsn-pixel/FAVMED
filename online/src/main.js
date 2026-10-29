@@ -298,6 +298,7 @@ async function renderOperationalModules(profile, userId) {
         <input id="operational-search" type="search" placeholder="Buscar paciente ou exame..." aria-label="Buscar paciente ou exame" />
         ${profile.role === 'profissional' ? '<select id="professional-room-filter" aria-label="Filtrar por sala"><option value="">Todas as salas</option></select>' : ''}
         <button class="secondary" id="export-operational-csv" type="button">Exportar CSV</button>
+        ${profile.role === 'recepcao' ? '<button class="secondary" id="backup-operational-json" type="button">Backup JSON</button>' : ''}
       </div>
       <div class="table-wrap"><table class="users-table operational-table">
         <thead><tr><th>Paciente / Atendimento</th><th>Exames</th><th>Status</th><th>Ação</th></tr></thead>
@@ -529,10 +530,32 @@ async function renderOperationalModules(profile, userId) {
   document.querySelector('#operational-search').addEventListener('input', () => loadOperationalRows());
   professionalRoomFilter?.addEventListener('change', () => loadOperationalRows());
   document.querySelector('#export-operational-csv').addEventListener('click', () => {
-    const tableRows = [...document.querySelectorAll('#operational-rows tr')].map((tr) => [...tr.cells].map((cell) => cell.innerText.replace(/\s+/g, ' ').trim()));
+    const tableRows = [...document.querySelectorAll('#operational-rows tr')].map((tr) => [...tr.cells].slice(0, 3).map((cell) => cell.innerText.replace(/\s+/g, ' ').trim()));
     const csv = tableRows.map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(',')).join('\r\n');
     const url = URL.createObjectURL(new Blob(['\ufeff', csv], { type: 'text/csv;charset=utf-8;' }));
     const link = document.createElement('a'); link.href = url; link.download = `favmed-atendimentos-${new Date().toISOString().slice(0, 10)}.csv`; link.click(); URL.revokeObjectURL(url);
+  });
+  document.querySelector('#backup-operational-json')?.addEventListener('click', async (event) => {
+    const button = event.currentTarget;
+    button.disabled = true; button.textContent = 'Gerando backup…';
+    try {
+      const { data: visits, error: visitsError } = await supabase.from('patient_visits')
+        .select('id, patient_id, visit_date, attendance_type, status, company_name, professional_id, room_id, checked_in_at, started_at, completed_at, priority, aso_pending, aso_completed, created_at')
+        .eq('visit_date', todayLocal()).order('checked_in_at', { ascending: true });
+      if (visitsError) throw visitsError;
+      const patientIds = [...new Set((visits || []).map((visit) => visit.patient_id))];
+      const visitIds = (visits || []).map((visit) => visit.id);
+      const [patientsResult, examsResult] = await Promise.all([
+        patientIds.length ? supabase.from('patients').select('id, full_name, cpf, birth_date, company_name, insurance, job_title, document_path, created_at').in('id', patientIds) : Promise.resolve({ data: [], error: null }),
+        visitIds.length ? supabase.from('visit_exams').select('id, visit_id, exam_name, room_id, status, result_summary, completed_by, completed_at, display_order').in('visit_id', visitIds) : Promise.resolve({ data: [], error: null }),
+      ]);
+      if (patientsResult.error || examsResult.error) throw patientsResult.error || examsResult.error;
+      const payload = { exported_at: new Date().toISOString(), date: todayLocal(), visits: visits || [], patients: patientsResult.data || [], exams: examsResult.data || [] };
+      const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8;' }));
+      const link = document.createElement('a'); link.href = url; link.download = `favmed-backup-${todayLocal()}.json`; link.click(); URL.revokeObjectURL(url);
+      operationalMessage('#operational-message', 'Backup JSON gerado. Guarde o arquivo em local seguro.');
+    } catch (error) { operationalMessage('#operational-message', error.message || 'Não foi possível gerar o backup.', true); }
+    finally { button.disabled = false; button.textContent = 'Backup JSON'; }
   });
   document.querySelector('#operational-rows').addEventListener('click', async (event) => {
     const examButton = event.target.closest('.exam-status-button');
