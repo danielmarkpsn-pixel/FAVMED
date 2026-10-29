@@ -21,8 +21,8 @@ Nunca coloque chaves secret/service_role no frontend, em variáveis `VITE_*` ou 
 - A implantação de produção da Vercel foi criada a partir da `main`, commit `0488912da4964f7fa82ebc42d3129117d1a687ab`, e está em estado READY.
 - A migração operacional `operational_foundation` foi aplicada ao projeto Supabase `qzjkoyqmjueosevzhxqa` em 2026-10-29. As tabelas `patients`, `professionals`, `rooms`, `patient_visits` e `visit_exams` existem com RLS habilitada e forçada.
 - Um teste transacional com dados sintéticos confirmou que a recepção pode inserir e ler um paciente durante a transação; a transação foi revertida e nenhum registro de teste foi mantido.
-- Um teste transacional com o perfil desativado confirmou que `private.current_active_role()` não retorna uma função ativa e que a consulta não revela pacientes. A transação foi revertida.
-- Os perfis existentes no momento da verificação são Master e recepção. Ainda é necessário testar com contas separadas de profissional e sala, além de concluir os fluxos completos de cadastro, fila, atendimento e exames antes de usar dados reais.
+- Testes transacionais com registros sintéticos e revertidos confirmaram: recepção consegue inserir/ler um paciente; profissional atribuído consegue ler o paciente, atendimento e exame vinculados; perfil de sala vê atendimento/exame da sala atribuída, mas não o registro pessoal do paciente; usuário inativo não consegue ler nem mesmo um paciente sintético.
+- Os testes de papéis foram simulados em transações SQL, não por sessões reais de navegador com JWT emitidos para cada perfil. Ainda é necessário validar login real, fluxos completos de cadastro/fila/atendimento/exames e erros de ponta a ponta antes de usar dados reais.
 
 ## Migrações
 
