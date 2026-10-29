@@ -232,7 +232,7 @@ async function renderOperationalModules(profile, userId) {
   panel.innerHTML = `
     <div class="operational-heading">
       <div><p class="eyebrow">OPERAÇÃO CLÍNICA</p><h2>Módulos operacionais</h2></div>
-      <button class="secondary" id="refresh-operational" type="button">Atualizar dados</button>
+      <div class="operational-heading-actions"><a class="secondary" href="/sala" target="_blank" rel="noopener noreferrer">Abrir tela de chamadas</a><button class="secondary" id="refresh-operational" type="button">Atualizar dados</button></div>
     </div>
     ${canRegister ? `
       <section class="module-card">
@@ -857,7 +857,7 @@ async function renderPublicWaitingRoom() {
 
 async function start() {
   if (!configured) return renderSetup();
-  if (window.location.pathname === '/sala') return renderPublicWaitingRoom();
+  if (window.location.pathname.replace(/\/+$/, '') === '/sala') return renderPublicWaitingRoom();
   // Supabase may return the flow type in the URL hash (implicit flow)
   // or the query string (depending on the email template / redirect setup).
   // Capture it before deciding whether an authenticated session may reach the panel.
