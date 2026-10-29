@@ -335,7 +335,7 @@ grant update (name, room_type, assigned_profile_id, active, display_order, updat
 grant select, insert, delete on public.patient_visits to authenticated;
 grant update (visit_date, attendance_type, status, company_name, professional_id, room_id, started_at, completed_at, updated_at) on public.patient_visits to authenticated;
 grant select, insert, delete on public.visit_exams to authenticated;
-grant update (status, result_summary, completed_at, display_order, updated_at) on public.visit_exams to authenticated;
+grant update (status, result_summary, display_order, updated_at) on public.visit_exams to authenticated;
 
 
 -- Keep timestamps current even when a client does not send updated_at.
