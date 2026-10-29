@@ -10,7 +10,7 @@ create or replace function private.current_active_role()
 returns text
 language sql
 stable
-security definer
+security invoker
 set search_path = pg_catalog, public
 as $$
   select p.role
@@ -115,6 +115,7 @@ alter table public.visit_exams force row level security;
 
 -- Patients: master and reception can manage records. Professionals can only read
 -- patients assigned to them through a visit. Waiting-room accounts never read all PII.
+drop policy if exists patients_select_authorized on public.patients;
 create policy patients_select_authorized on public.patients
 for select to authenticated
 using (
@@ -219,6 +220,7 @@ for update to authenticated
 using (private.current_active_role() in ('master', 'recepcao'))
 with check (private.current_active_role() in ('master', 'recepcao'));
 
+drop policy if exists patient_visits_update_professional on public.patient_visits;
 create policy patient_visits_update_professional on public.patient_visits
 for update to authenticated
 using (
@@ -264,6 +266,7 @@ for update to authenticated
 using (private.current_active_role() in ('master', 'recepcao'))
 with check (private.current_active_role() in ('master', 'recepcao'));
 
+drop policy if exists visit_exams_update_professional on public.visit_exams;
 create policy visit_exams_update_professional on public.visit_exams
 for update to authenticated
 using (
@@ -293,3 +296,34 @@ grant select, insert, update, delete on public.professionals to authenticated;
 grant select, insert, update, delete on public.rooms to authenticated;
 grant select, insert, update, delete on public.patient_visits to authenticated;
 grant select, insert, update, delete on public.visit_exams to authenticated;
+
+
+-- Keep timestamps current even when a client does not send updated_at.
+create or replace function private.set_updated_at()
+returns trigger
+language plpgsql
+security invoker
+set search_path = pg_catalog
+as $$
+begin
+  new.updated_at := now();
+  return new;
+end;
+$$;
+revoke all on function private.set_updated_at() from public, anon, authenticated;
+
+drop trigger if exists patients_set_updated_at on public.patients;
+create trigger patients_set_updated_at before update on public.patients
+for each row execute function private.set_updated_at();
+drop trigger if exists professionals_set_updated_at on public.professionals;
+create trigger professionals_set_updated_at before update on public.professionals
+for each row execute function private.set_updated_at();
+drop trigger if exists rooms_set_updated_at on public.rooms;
+create trigger rooms_set_updated_at before update on public.rooms
+for each row execute function private.set_updated_at();
+drop trigger if exists patient_visits_set_updated_at on public.patient_visits;
+create trigger patient_visits_set_updated_at before update on public.patient_visits
+for each row execute function private.set_updated_at();
+drop trigger if exists visit_exams_set_updated_at on public.visit_exams;
+create trigger visit_exams_set_updated_at before update on public.visit_exams
+for each row execute function private.set_updated_at();
