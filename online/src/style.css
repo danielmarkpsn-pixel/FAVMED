@@ -208,3 +208,11 @@ textarea:focus { outline: 3px solid #087f8c20; border-color: var(--teal); }
 .waiting-note { margin-top: 26px; font-size: 14px; }
 .waiting-screen footer { text-align: center; margin-top: 50px; color: var(--muted); font-size: 12px; }
 @media (max-width: 600px) { .waiting-brand .brand-logo { width: 48px; height: 48px; } .call-card { align-items: flex-start; flex-direction: column; } .call-room { text-align: left; } .public-live { font-size: 10px; } }
+
+.audio-enable { margin-left: auto; white-space: nowrap; }
+.waiting-brand .public-live { margin-left: 0; white-space: nowrap; }
+@media (max-width: 680px) {
+  .waiting-brand { flex-wrap: wrap; }
+  .audio-enable { margin-left: 0; }
+  .waiting-brand .public-live { margin-left: auto; }
+}
