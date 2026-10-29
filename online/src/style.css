@@ -183,3 +183,28 @@ textarea:focus { outline: 3px solid #087f8c20; border-color: var(--teal); }
 .service-option input { flex: 0 0 auto; }
 .operational-form .submit { margin-top: 16px; }
 @media (max-width: 480px) { .service-options { grid-template-columns: 1fr; } }
+
+
+/* Public waiting-room display: call-only, no sign-in or clinical records */
+.waiting-screen { min-height: 100vh; padding: clamp(18px, 4vw, 48px); background: radial-gradient(ellipse at top right, #d9f0ef 0, transparent 42%), #f3f6f8; color: var(--ink); }
+.waiting-brand { max-width: 1280px; margin: 0 auto; display: flex; align-items: center; gap: 16px; padding: 12px 0 26px; border-bottom: 1px solid var(--line); }
+.waiting-brand .brand-logo { width: 68px; height: 68px; object-fit: contain; }
+.waiting-brand h1 { margin: 0; font-size: clamp(22px, 3vw, 34px); }
+.waiting-brand p { margin: 5px 0 0; font-size: 12px; letter-spacing: .16em; color: var(--muted); font-weight: 800; }
+.public-live { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; color: #147d55; font-size: 12px; font-weight: 800; }
+.public-live i { width: 9px; height: 9px; border-radius: 50%; background: #22a06b; box-shadow: 0 0 0 5px #22a06b22; }
+.waiting-content { max-width: 1050px; margin: clamp(32px, 7vh, 70px) auto 0; text-align: center; }
+.waiting-content h2 { font-size: clamp(28px, 5vw, 48px); margin: 4px 0 28px; }
+.public-calls { display: grid; gap: 14px; text-align: left; }
+.call-card { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: clamp(18px, 3vw, 30px); border: 1px solid var(--line); border-radius: 18px; background: #fff; box-shadow: 0 8px 28px #173c4a0c; }
+.call-card.current-call { border: 2px solid var(--teal); background: #f4ffff; }
+.call-label, .call-room span { color: var(--muted); font-size: 11px; letter-spacing: .1em; font-weight: 800; }
+.call-card h3 { font-size: clamp(24px, 4vw, 38px); margin: 7px 0 0; }
+.call-room { display: grid; gap: 6px; text-align: right; }
+.call-room strong { font-size: clamp(18px, 3vw, 27px); color: var(--teal); }
+.no-calls { padding: 38px 18px; border: 1px solid var(--line); border-radius: 18px; background: #fff; text-align: center; }
+.no-calls h3 { font-size: clamp(20px, 3vw, 30px); margin: 0 0 8px; }
+.no-calls p, .waiting-note { color: var(--muted); }
+.waiting-note { margin-top: 26px; font-size: 14px; }
+.waiting-screen footer { text-align: center; margin-top: 50px; color: var(--muted); font-size: 12px; }
+@media (max-width: 600px) { .waiting-brand .brand-logo { width: 48px; height: 48px; } .call-card { align-items: flex-start; flex-direction: column; } .call-room { text-align: left; } .public-live { font-size: 10px; } }
