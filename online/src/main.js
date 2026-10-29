@@ -270,11 +270,13 @@ async function renderOperationalModules(profile, userId) {
   const professionalSelect = document.querySelector('#visit-professional');
   const roomSelect = document.querySelector('#visit-room');
   const roomAssignedSelect = document.querySelector('#room-assigned-profile');
+  let roomUsers = [];
   if (roomAssignedSelect) {
-    const { data: roomUsers, error: roomUsersError } = await supabase.from('profiles')
+    const { data: fetchedRoomUsers, error: roomUsersError } = await supabase.from('profiles')
       .select('id, display_name').eq('role', 'sala').eq('active', true).order('display_name');
     if (!roomUsersError) {
-      roomAssignedSelect.innerHTML = '<option value="">Sem vínculo</option>' + (roomUsers || []).map((u) => `<option value="${escapeHtml(u.id)}">${escapeHtml(u.display_name || 'Sala de espera')}</option>`).join('');
+      roomUsers = fetchedRoomUsers || [];
+      roomAssignedSelect.innerHTML = '<option value="">Sem vínculo</option>' + roomUsers.map((u) => `<option value="${escapeHtml(u.id)}">${escapeHtml(u.display_name || 'Sala de espera')}</option>`).join('');
     }
   }
   if (profile.role === 'master') {
