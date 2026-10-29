@@ -345,7 +345,7 @@ async function renderOperationalModules(profile, userId) {
     if (!rows) return;
     rows.innerHTML = '<tr><td colspan="4">Carregando dados…</td></tr>';
     let visitsQuery = supabase.from('patient_visits')
-      .select('id, patient_id, visit_date, attendance_type, status, professional_id, room_id, checked_in_at')
+      .select('id, patient_id, visit_date, attendance_type, status, professional_id, room_id, checked_in_at, priority, aso_pending, aso_completed')
       .order('checked_in_at', { ascending: false }).limit(100);
     let assignedRoomId = '';
     if (profile.role === 'profissional') visitsQuery = visitsQuery.eq('professional_id', userId);
@@ -384,7 +384,7 @@ async function renderOperationalModules(profile, userId) {
     const visitIds = (visits || []).map((visit) => visit.id);
     const patientIds = [...new Set((visits || []).map((visit) => visit.patient_id))];
     const [patientsResult, examsResult] = await Promise.all([
-      patientIds.length ? supabase.from('patients').select('id, full_name, company_name').in('id', patientIds) : Promise.resolve({ data: [], error: null }),
+      patientIds.length ? supabase.from('patients').select('id, full_name, company_name, insurance, job_title').in('id', patientIds) : Promise.resolve({ data: [], error: null }),
       visitIds.length ? supabase.from('visit_exams').select('id, visit_id, exam_name, status, room_id, display_order').in('visit_id', visitIds).order('display_order') : Promise.resolve({ data: [], error: null }),
     ]);
     if (patientsResult.error || examsResult.error) {
@@ -418,11 +418,15 @@ async function renderOperationalModules(profile, userId) {
               : visit.status === 'em_atendimento'
                 ? `<button type="button" class="secondary visit-status-button" data-visit-id="${escapeHtml(visit.id)}" data-next-status="atendido">Concluir atendimento</button>`
                 : '')
-          : '');
+          : profile.role === 'recepcao'
+            ? `<button type="button" class="secondary priority-toggle-button" data-visit-id="${escapeHtml(visit.id)}" data-next-priority="${!visit.priority}">${visit.priority ? 'Retirar prioridade' : 'Marcar prioridade'}</button> <button type="button" class="secondary aso-toggle-button ${visit.aso_completed ? 'aso-completed' : visit.aso_pending ? 'aso-pending' : ''}" data-visit-id="${escapeHtml(visit.id)}" data-next-aso="${visit.aso_completed ? 'reset' : visit.aso_pending ? 'complete' : 'pending'}">${visit.aso_completed ? 'ASO REALIZADO ✓' : visit.aso_pending ? 'ASO PENDENTE · Marcar realizado' : 'Marcar ASO pendente'}</button>`
+            : '');
       const examLabels = visitExams.length ? visitExams.map((exam) => `<span class="exam-pill">${escapeHtml(exam.exam_name)} · ${escapeHtml(exam.status)}</span>`).join(' ') : '<span class="muted">Sem exames vinculados</span>';
       const patientLabel = roomMode ? `Atendimento #${escapeHtml(visit.id.slice(0, 8))}` : escapeHtml(patient?.full_name || 'Paciente não visível');
+      const flags = profile.role === 'recepcao' ? `${visit.priority ? '<span class="priority-flag">PRIORIDADE</span>' : ''}${visit.aso_completed ? '<span class="aso-flag aso-completed">ASO REALIZADO</span>' : visit.aso_pending ? '<span class="aso-flag aso-pending">ASO PENDENTE</span>' : ''}` : '';
       const company = patient?.company_name ? `<br><small>${escapeHtml(patient.company_name)}</small>` : '';
-      return `<tr><td><strong>${patientLabel}</strong>${company}<br><small>${escapeHtml(visit.attendance_type)} · ${escapeHtml(visit.visit_date)}</small></td><td>${examLabels}</td><td><span class="status-pill ${status === 'atendido' ? 'active' : status === 'cancelado' ? 'inactive' : ''}">${escapeHtml(operationalStatuses[status] || status)}</span></td><td>${action || '<span class="muted">—</span>'}</td></tr>`;
+      const extraPatient = patient?.insurance || patient?.job_title ? `<br><small>${escapeHtml([patient.insurance, patient.job_title].filter(Boolean).join(' · '))}</small>` : '';
+      return `<tr><td><strong>${patientLabel}</strong> ${flags}${company}${extraPatient}<br><small>${escapeHtml(visit.attendance_type)} · ${escapeHtml(visit.visit_date)}</small></td><td>${examLabels}</td><td><span class="status-pill ${status === 'atendido' ? 'active' : status === 'cancelado' ? 'inactive' : ''}">${escapeHtml(operationalStatuses[status] || status)}</span></td><td>${action || '<span class="muted">—</span>'}</td></tr>`;
     }).join('');
   }
 
@@ -489,6 +493,8 @@ async function renderOperationalModules(profile, userId) {
   document.querySelector('#operational-rows').addEventListener('click', async (event) => {
     const examButton = event.target.closest('.exam-status-button');
     const visitButton = event.target.closest('.visit-status-button');
+    const priorityButton = event.target.closest('.priority-toggle-button');
+    const asoButton = event.target.closest('.aso-toggle-button');
     try {
       if (examButton) {
         examButton.disabled = true;
@@ -504,13 +510,28 @@ async function renderOperationalModules(profile, userId) {
         const payload = { status: nextStatus, updated_at: new Date().toISOString() };
         const { error } = await supabase.from('patient_visits').update(payload).eq('id', visitButton.dataset.visitId);
         if (error) throw error;
-        operationalMessage('#operational-message', 'Status do atendimento atualizado.');
+        operationalMessage('#operational-message', nextStatus === 'chamado' ? 'Paciente chamado. O painel público será atualizado.' : 'Status do atendimento atualizado.');
+        await loadOperationalRows();
+      } else if (priorityButton) {
+        priorityButton.disabled = true;
+        const { error } = await supabase.from('patient_visits').update({ priority: priorityButton.dataset.nextPriority === 'true' }).eq('id', priorityButton.dataset.visitId);
+        if (error) throw error;
+        await loadOperationalRows();
+      } else if (asoButton) {
+        asoButton.disabled = true;
+        const next = asoButton.dataset.nextAso;
+        const flags = next === 'complete' ? { aso_pending: false, aso_completed: true } : next === 'pending' ? { aso_pending: true, aso_completed: false } : { aso_pending: false, aso_completed: false };
+        const { error } = await supabase.from('patient_visits').update(flags).eq('id', asoButton.dataset.visitId);
+        if (error) throw error;
+        operationalMessage('#operational-message', next === 'complete' ? 'ASO marcado como realizado.' : next === 'pending' ? 'ASO marcado como pendente.' : 'Status do ASO removido.');
         await loadOperationalRows();
       }
     } catch (error) {
       operationalMessage('#operational-message', error.message || 'Não foi possível atualizar o status.', true);
       if (examButton) examButton.disabled = false;
       if (visitButton) visitButton.disabled = false;
+      if (priorityButton) priorityButton.disabled = false;
+      if (asoButton) asoButton.disabled = false;
     }
   });
   await loadOperationalRows();
