@@ -216,3 +216,25 @@ textarea:focus { outline: 3px solid #087f8c20; border-color: var(--teal); }
   .audio-enable { margin-left: 0; }
   .waiting-brand .public-live { margin-left: auto; }
 }
+
+
+/* Restored reception/professional tools */
+.operational-tools { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 16px; align-items: center; }
+.operational-tools input[type="search"], .operational-tools select { flex: 1 1 220px; min-width: 170px; }
+.exam-room-menu { border: 1px solid var(--line); border-radius: 10px; background: #fbfdfe; margin: 8px 0; overflow: hidden; }
+.exam-room-menu > summary { cursor: pointer; padding: 10px 12px; font-size: 12px; font-weight: 800; color: var(--teal); background: #f0f8f8; }
+.exam-room-menu .service-options { border: 0; border-radius: 0; }
+.reception-flags { display: flex; flex-wrap: wrap; gap: 16px; padding: 14px 2px 0; }
+.priority-flag, .aso-flag { display: inline-flex; align-items: center; margin: 2px 4px; padding: 3px 7px; border-radius: 999px; font-size: 10px; font-weight: 850; white-space: nowrap; }
+.priority-flag, .aso-pending { color: #8a4b00; background: #fff0c2; }
+.aso-completed { color: #166534; background: #d9fbe5; }
+.aso-toggle-button.aso-pending { background: #fff0c2; border-color: #f4cf71; color: #8a4b00; }
+.aso-toggle-button.aso-completed { background: #d9fbe5; border-color: #8bd4a8; color: #166534; }
+.patient-sheet-dialog { width: min(560px, calc(100% - 28px)); max-height: 85vh; overflow: auto; border: 1px solid var(--line); border-radius: 16px; padding: 24px; color: var(--ink); background: white; box-shadow: 0 24px 80px #122c3c40; }
+.patient-sheet-dialog::backdrop { background: #102c3c80; }
+.patient-sheet-dialog h2 { margin-top: 0; }
+.patient-sheet-dialog dl { display: grid; grid-template-columns: minmax(130px, .7fr) minmax(0, 1.3fr); gap: 10px; }
+.patient-sheet-dialog dt { color: var(--muted); font-size: 12px; font-weight: 750; }
+.patient-sheet-dialog dd { margin: 0; overflow-wrap: anywhere; }
+.patient-sheet-dialog form { display: flex; justify-content: flex-end; }
+@media (max-width: 520px) { .patient-sheet-dialog dl { grid-template-columns: 1fr; gap: 3px; } .patient-sheet-dialog dd { margin-bottom: 10px; } }
