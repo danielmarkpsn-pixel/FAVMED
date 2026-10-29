@@ -43,7 +43,7 @@ assert.match(operationalMigration, /profiles_select_staff_directory/);
 assert.match(operationalMigration, /room_type text not null default 'outro'/);
 assert.doesNotMatch(operationalMigration, /room_type text not null default 'atendimento'/);
 assert.match(operationalMigration, /visit_exams_update_room/);
-assert.ok(operationalMigration.includes('grant update (status, result_summary, completed_at, display_order, updated_at) on public.visit_exams to authenticated;'));
+assert.ok(operationalMigration.includes('grant update (status, result_summary, display_order, updated_at) on public.visit_exams to authenticated;'));
 assert.ok(!operationalMigration.includes('grant update (status, result_summary, completed_by'));
 assert.ok(operationalMigration.includes('create or replace function private.set_visit_exam_completion'));
 assert.ok(operationalMigration.includes('new.completed_by := (select auth.uid());'));
