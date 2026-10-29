@@ -244,3 +244,7 @@ textarea:focus { outline: 3px solid #087f8c20; border-color: var(--teal); }
 .patient-edit-dialog .submit { width: 100%; margin-top: 12px; }
 .patient-edit-dialog .users-heading { align-items: center; gap: 10px; }
 .patient-edit-dialog .users-heading h2 { font-size: 20px; }
+
+.operational-heading-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.operational-heading-actions a { display: inline-flex; align-items: center; justify-content: center; padding: 10px 14px; border: 1px solid var(--line); border-radius: 10px; color: var(--teal); background: #fff; font-size: 13px; font-weight: 750; text-decoration: none; }
+.operational-heading-actions a:hover { background: #f0f8f8; }
