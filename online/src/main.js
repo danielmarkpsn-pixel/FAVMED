@@ -209,7 +209,13 @@ const operationalStatuses = {
   atendido: 'Atendido',
   cancelado: 'Cancelado',
 };
-const defaultExams = ['ASO', 'Audiometria', 'Acuidade visual', 'Espirometria', 'Eletrocardiograma', 'Teste Ergonométrico', 'Acetona na Urina', 'Acuidade com percepção de cores'];
+const examCatalog = {
+  'Sala 1': ['Raio-X', 'Tórax PA', 'Tórax Perfil', 'Tórax OIT', 'Tórax AP', 'Coluna Lombar', 'Coluna Lombo Sacra', 'Coluna Total', 'Coluna Cervical', 'Coluna Torácica', 'Coluna Dorsal', 'Ombros', 'Ombro D', 'Ombro E', 'Mãos', 'Mão D', 'Mão E', 'Joelhos', 'Joelhos D', 'Joelhos E', 'Punhos', 'Punhos D', 'Punhos E'],
+  'Sala 2': ['Coleta de sangue', 'Hemograma C.', 'Glicose', 'Creatinina', 'Tipagem S.', 'Beta', 'Colesterol', 'Colinesterase', 'Cultura F', 'EPF', 'EAS', 'Acetona', 'Teste Ergonométrico', 'Acetona na Urina', 'Ácido Mandélico', 'Hemoglobina Glicada', 'Lipidograma', 'Chumbo na Urina', 'Micológico', 'Toxicológico', 'Triglicerídeos', 'TGO', 'TGP', 'Chumbo sanguíneo', 'Hepatite HBsAg', 'Hepatite Anti-HBs', 'Hepatite Anti-HCV', 'Hepatite B - ANTI-HBC TOTAL', 'Metil etil cetona', 'Ácido metil-hipúrico', 'Ácido hipúrico', 'Ácido delta-aminolevulínico'],
+  'Sala 3': ['Audiometria', 'Audiometria Tonal', 'Audiometria Vocal', 'Audiometria Ocupacional', 'Audiometria Concurso', 'Teste Otoneurológico', 'Teste Vestibular'],
+  'Sala 4': ['EEG', 'ECG', 'Espirometria', 'Acuidade', 'Acuidade com percepção de cores', 'Av Psico', 'Mapa 24h', 'Holter 24h', 'Risco Cirúrgico'],
+};
+const defaultExams = [...new Set(Object.values(examCatalog).flat().concat(['ASO']))];
 
 function operationalMessage(target, message, isError = false) {
   const node = document.querySelector(target);
@@ -239,12 +245,14 @@ async function renderOperationalModules(profile, userId) {
               <div class="field"><label for="patient-cpf">CPF (somente números)</label><input id="patient-cpf" name="cpf" inputmode="numeric" pattern="[0-9]{11}" maxlength="11" placeholder="11 dígitos"></div>
               <div class="field"><label for="patient-birth">DATA DE NASCIMENTO</label><input id="patient-birth" name="birth_date" type="date"></div>
               <div class="field"><label for="patient-company">EMPRESA</label><input id="patient-company" name="company_name" maxlength="160" placeholder="Nome da empresa"></div>
+              <div class="field"><label for="patient-insurance">CONVÊNIO / PARTICULAR</label><input id="patient-insurance" name="insurance" maxlength="100" placeholder="Convênio ou particular"></div>
+              <div class="field"><label for="patient-job">FUNÇÃO / CARGO</label><input id="patient-job" name="job_title" maxlength="100" placeholder="Função do paciente"></div>
             </div>
           </details>
           <details class="form-module">
             <summary>Tipo de Exame / Atendimento</summary>
             <div class="module-content">
-              <div class="field"><label for="visit-type">TIPO DE EXAME / ATENDIMENTO *</label><select id="visit-type" name="attendance_type" required><option value="Pontual">Pontual</option><option value="Consulta Ocupacional">Consulta Ocupacional</option><option value="Agendado">Agendado</option></select></div>
+              <div class="field"><label for="visit-type">TIPO DE EXAME / ATENDIMENTO *</label><select id="visit-type" name="attendance_type" required><option value="Admissional">Admissional</option><option value="Demissional">Demissional</option><option value="Periódico">Periódico</option><option value="Retorno">Retorno</option><option value="Mudança de riscos">Mudança de riscos</option><option value="Particular">Particular</option><option value="Pontual">Pontual</option><option value="Consulta Ocupacional">Consulta Ocupacional</option><option value="Concurso">Concurso</option><option value="Agendado">Agendado</option></select></div>
               <div class="field"><label for="visit-professional">PROFISSIONAL</label><select id="visit-professional" name="professional_id"><option value="">A definir</option></select></div>
               <div class="field"><label for="visit-room">SALA INICIAL</label><select id="visit-room" name="room_id"><option value="">A definir</option></select><p class="sub" style="margin:7px 0 0">A sala inicial pode ser definida agora ou durante o atendimento.</p></div>
             </div>
@@ -252,13 +260,18 @@ async function renderOperationalModules(profile, userId) {
           <details class="form-module">
             <summary>Marcar Exames Específicos</summary>
             <div class="module-content">
-              <div class="field"><label>EXAMES SOLICITADOS (MARQUE TODOS)</label><div class="service-options">
-                ${defaultExams.map((exam) => `<label class="service-option"><input type="checkbox" name="exam_names" value="${escapeHtml(exam)}"> ${escapeHtml(exam)}</label>`).join('')}
-              </div></div>
+              <div class="field"><label>EXAMES SOLICITADOS (MARQUE TODOS POR SALA)</label>
+                ${Object.entries(examCatalog).map(([roomName, exams]) => `<details class="exam-room-menu"><summary>${escapeHtml(roomName)} — ${roomName === 'Sala 1' ? 'RX' : roomName === 'Sala 2' ? 'Coleta / laboratório' : roomName === 'Sala 3' ? 'Audiometria' : 'Exames complementares'}</summary><div class="service-options">${exams.map((exam) => `<label class="service-option"><input type="checkbox" name="exam_names" data-room-name="${roomName}" value="${escapeHtml(exam)}"> ${escapeHtml(exam)}</label>`).join('')}</div></details>`).join('')}
+                <div class="service-options"><label class="service-option"><input type="checkbox" name="exam_names" value="ASO"> ASO</label></div>
+              </div>
               <div class="field"><label for="other-exams">OUTROS EXAMES (OPCIONAL)</label><textarea id="other-exams" name="other_exam_names" rows="3" placeholder="Digite outros exames, um por linha"></textarea></div>
             </div>
           </details>
-          <button class="submit" id="checkin-submit" type="submit">Cadastrar e colocar na fila</button>
+          <div class="module-content reception-flags">
+            <label class="service-option"><input type="checkbox" name="priority" value="true"> Prioridade no atendimento</label>
+            <label class="service-option"><input type="checkbox" name="aso_pending" value="true"> ASO pendente</label>
+          </div>
+          <button class="submit" id="checkin-submit" type="submit">Cadastrar paciente e gerar ficha</button>
           <p id="checkin-message" class="message" role="status"></p>
         </form>
       </section>` : ''}
@@ -424,7 +437,8 @@ async function renderOperationalModules(profile, userId) {
         operationalMessage('#checkin-message', 'O CPF deve conter exatamente 11 números.', true);
         return;
       }
-      const examNames = [...new Set([...form.querySelectorAll('input[name="exam_names"]:checked')].map((input) => input.value.trim()).concat(String(values.other_exam_names || '').split(/[\n,;]/).map((name) => name.trim()).filter(Boolean)))];
+      const selectedExamInputs = [...form.querySelectorAll('input[name="exam_names"]:checked')];
+      const examNames = [...new Map(selectedExamInputs.map((input) => [input.value.trim(), { name: input.value.trim(), roomName: input.dataset.roomName || '' }]).concat(String(values.other_exam_names || '').split(/[\n,;]/).map((name) => name.trim()).filter(Boolean).map((name) => [name, { name, roomName: '' }]))).values()];
       button.disabled = true;
       button.textContent = 'Salvando cadastro…';
       operationalMessage('#checkin-message', '');
@@ -434,6 +448,8 @@ async function renderOperationalModules(profile, userId) {
           cpf: cpf || null,
           birth_date: values.birth_date || null,
           company_name: String(values.company_name || '').trim() || null,
+          insurance: String(values.insurance || '').trim() || null,
+          job_title: String(values.job_title || '').trim() || null,
           created_by: userId,
         }).select('id').single();
         if (patientError) throw patientError;
@@ -443,12 +459,16 @@ async function renderOperationalModules(profile, userId) {
           professional_id: values.professional_id || null,
           room_id: values.room_id || null,
           company_name: String(values.company_name || '').trim() || null,
+          priority: values.priority === 'true',
+          aso_pending: values.aso_pending === 'true',
+          aso_completed: false,
           created_by: userId,
         }).select('id').single();
         if (visitError) throw new Error(`Paciente salvo, mas não foi possível abrir o atendimento: ${visitError.message}`);
         if (examNames.length) {
-          const examRows = examNames.map((exam_name, index) => ({
-            visit_id: visit.id, exam_name, room_id: values.room_id || null, display_order: index,
+          const roomIdByName = new Map((roomResult.data || []).map((room) => [room.name, room.id]));
+          const examRows = examNames.map((exam, index) => ({
+            visit_id: visit.id, exam_name: exam.name, room_id: roomIdByName.get(exam.roomName) || values.room_id || null, display_order: index,
           }));
           const { error: examError } = await supabase.from('visit_exams').insert(examRows);
           if (examError) throw new Error(`Atendimento criado, mas não foi possível salvar os exames: ${examError.message}`);
