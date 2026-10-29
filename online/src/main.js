@@ -204,6 +204,7 @@ function renderUserRows(users) {
 
 const operationalStatuses = {
   aguardando: 'Aguardando',
+  chamado: 'Chamado',
   em_atendimento: 'Em atendimento',
   atendido: 'Atendido',
   cancelado: 'Cancelado',
@@ -397,7 +398,13 @@ async function renderOperationalModules(profile, userId) {
       const action = roomMode
         ? visitExams.map((exam) => `<button type="button" class="secondary exam-status-button" data-exam-id="${escapeHtml(exam.id)}" data-next-status="${exam.status === 'pendente' ? 'em_atendimento' : 'realizado'}">${escapeHtml(exam.exam_name)}: ${exam.status === 'pendente' ? 'Iniciar' : 'Marcar realizado'}</button>`).join(' ')
         : (profile.role === 'profissional'
-          ? `<button type="button" class="secondary visit-status-button" data-visit-id="${escapeHtml(visit.id)}" data-next-status="${visit.status === 'aguardando' ? 'em_atendimento' : 'atendido'}">${visit.status === 'aguardando' ? 'Iniciar atendimento' : visit.status === 'em_atendimento' ? 'Concluir atendimento' : 'Atualizar status'}</button>`
+          ? (visit.status === 'aguardando'
+            ? `<button type="button" class="secondary visit-status-button" data-visit-id="${escapeHtml(visit.id)}" data-next-status="chamado">🔊 Chamar paciente</button>`
+            : visit.status === 'chamado'
+              ? `<button type="button" class="secondary visit-status-button" data-visit-id="${escapeHtml(visit.id)}" data-next-status="em_atendimento">Iniciar atendimento</button>`
+              : visit.status === 'em_atendimento'
+                ? `<button type="button" class="secondary visit-status-button" data-visit-id="${escapeHtml(visit.id)}" data-next-status="atendido">Concluir atendimento</button>`
+                : '')
           : '');
       const examLabels = visitExams.length ? visitExams.map((exam) => `<span class="exam-pill">${escapeHtml(exam.exam_name)} · ${escapeHtml(exam.status)}</span>`).join(' ') : '<span class="muted">Sem exames vinculados</span>';
       const patientLabel = roomMode ? `Atendimento #${escapeHtml(visit.id.slice(0, 8))}` : escapeHtml(patient?.full_name || 'Paciente não visível');
