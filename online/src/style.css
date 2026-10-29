@@ -133,3 +133,36 @@ textarea:focus { outline: 3px solid #087f8c20; border-color: var(--teal); }
   .module-card { padding: 14px 10px; }
   .form-grid { grid-template-columns: 1fr; }
 }
+
+
+/* Identidade visual FAVMED e recepção alinhadas ao padrão local */
+.dashboard-shell { justify-content: flex-start; align-items: stretch; padding: 0; background: radial-gradient(ellipse at top right, #d9f0ef 0, transparent 42%), #f3f6f8; }
+.dashboard-shell .login-card { width: min(100%, 1400px); margin: 0 auto; padding: 0 clamp(14px, 3vw, 32px) 28px; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.home-card > .brand-mark { display: none; }
+.brand-logo { display: block; width: 54px; height: 54px; object-fit: contain; flex: 0 0 54px; }
+.app-header { margin: 0 calc(clamp(14px, 3vw, 32px) * -1); padding: 22px clamp(16px, 4vw, 42px); border-bottom: 1px solid var(--line); background: #ffffffd9; }
+.brand { display: flex; align-items: center; gap: 13px; min-width: 0; }
+.brand-copy { min-width: 0; }
+.brand-copy h1 { margin: 0; font-size: clamp(18px, 2.4vw, 23px); line-height: 1.25; letter-spacing: .1px; }
+.brand-copy p { margin: 5px 0 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.operational-panel { display: grid; grid-template-columns: minmax(290px, .78fr) minmax(0, 1.22fr); gap: 0 18px; margin-top: 22px; padding-top: 0; border-top: 0; align-items: start; }
+.operational-heading { grid-column: 1 / -1; margin-bottom: 2px; padding: 0 0 8px; }
+.operational-panel > .module-card:first-of-type { grid-column: 1; grid-row: 2; margin-top: 12px; }
+.operational-panel > .module-card:last-of-type { grid-column: 2; grid-row: 2; margin-top: 12px; min-width: 0; }
+.operational-panel > .module-card:nth-of-type(2):not(:last-of-type) { grid-column: 1 / -1; }
+.operational-table { min-width: 600px; }
+#sign-out { margin-top: 22px; }
+.dashboard-shell footer { padding-bottom: 16px; }
+@media (max-width: 850px) {
+  .operational-panel { grid-template-columns: minmax(0, 1fr); }
+  .operational-heading, .operational-panel > .module-card:first-of-type,
+  .operational-panel > .module-card:last-of-type,
+  .operational-panel > .module-card:nth-of-type(2):not(:last-of-type) { grid-column: 1; grid-row: auto; }
+}
+@media (max-width: 640px) {
+  .dashboard-shell .login-card { padding: 0 12px 22px; }
+  .app-header { margin: 0 -12px; padding: 16px 14px; }
+  .brand-logo { width: 46px; height: 46px; flex-basis: 46px; }
+  .brand-copy h1 { font-size: 18px; }
+  .module-card { min-width: 0; }
+}
