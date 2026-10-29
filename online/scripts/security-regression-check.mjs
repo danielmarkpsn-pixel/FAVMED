@@ -40,6 +40,8 @@ assert.match(operationalMigration, /alter table public\.patients enable row leve
 assert.match(operationalMigration, /alter table public\.patient_visits force row level security/);
 assert.match(operationalMigration, /security definer/);
 assert.match(operationalMigration, /profiles_select_staff_directory/);
+assert.match(operationalMigration, /room_type text not null default 'outro'/);
+assert.doesNotMatch(operationalMigration, /room_type text not null default 'atendimento'/);
 assert.match(operationalMigration, /visit_exams_update_room/);
 assert.match(operationalMigration, /grant update \(status, result_summary, completed_by, completed_at, display_order, updated_at\) on public\.visit_exams/);
 assert.match(operationalMigration, /grant update \(visit_date, attendance_type, status, company_name, professional_id, room_id, started_at, completed_at, updated_at\) on public\.patient_visits/);
