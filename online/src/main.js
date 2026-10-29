@@ -431,6 +431,7 @@ async function renderOperationalModules(profile, userId) {
       const visitExams = exams.filter((exam) => exam.visit_id === visit.id);
       const status = roomMode ? (visitExams.some((exam) => exam.status === 'em_atendimento') ? 'em_atendimento' : (visitExams.every((exam) => exam.status === 'realizado') ? 'atendido' : 'aguardando')) : visit.status;
       const sheetButton = !roomMode && patient ? `<button type="button" class="secondary patient-sheet-button" data-patient-id="${escapeHtml(patient.id)}">Visualizar Ficha</button>` : '';
+      const editButton = profile.role === 'recepcao' && patient ? `<button type="button" class="secondary edit-patient-button" data-patient-id="${escapeHtml(patient.id)}" data-visit-id="${escapeHtml(visit.id)}">Editar / adicionar exames</button>` : '';
       const action = roomMode
         ? visitExams.map((exam) => `<button type="button" class="secondary exam-status-button" data-exam-id="${escapeHtml(exam.id)}" data-next-status="${exam.status === 'pendente' ? 'em_atendimento' : 'realizado'}">${escapeHtml(exam.exam_name)}: ${exam.status === 'pendente' ? 'Iniciar' : 'Marcar realizado'}</button>`).join(' ')
         : (profile.role === 'profissional'
@@ -442,7 +443,7 @@ async function renderOperationalModules(profile, userId) {
                 ? `<button type="button" class="secondary visit-status-button" data-visit-id="${escapeHtml(visit.id)}" data-next-status="atendido">Concluir atendimento</button>`
                 : '')}`
           : profile.role === 'recepcao'
-            ? `${sheetButton} <button type="button" class="secondary priority-toggle-button" data-visit-id="${escapeHtml(visit.id)}" data-next-priority="${!visit.priority}">${visit.priority ? 'Retirar prioridade' : 'Marcar prioridade'}</button> <button type="button" class="secondary aso-toggle-button ${visit.aso_completed ? 'aso-completed' : visit.aso_pending ? 'aso-pending' : ''}" data-visit-id="${escapeHtml(visit.id)}" data-next-aso="${visit.aso_completed ? 'reset' : visit.aso_pending ? 'complete' : 'pending'}">${visit.aso_completed ? 'ASO REALIZADO ✓' : visit.aso_pending ? 'ASO PENDENTE · Marcar realizado' : 'Marcar ASO pendente'}</button>`
+            ? `${sheetButton} ${editButton} <button type="button" class="secondary priority-toggle-button" data-visit-id="${escapeHtml(visit.id)}" data-next-priority="${!visit.priority}">${visit.priority ? 'Retirar prioridade' : 'Marcar prioridade'}</button> <button type="button" class="secondary aso-toggle-button ${visit.aso_completed ? 'aso-completed' : visit.aso_pending ? 'aso-pending' : ''}" data-visit-id="${escapeHtml(visit.id)}" data-next-aso="${visit.aso_completed ? 'reset' : visit.aso_pending ? 'complete' : 'pending'}">${visit.aso_completed ? 'ASO REALIZADO ✓' : visit.aso_pending ? 'ASO PENDENTE · Marcar realizado' : 'Marcar ASO pendente'}</button>`
             : '');
       const examLabels = visitExams.length ? visitExams.map((exam) => `<span class="exam-pill">${escapeHtml(exam.exam_name)} · ${escapeHtml(exam.status)}</span>`).join(' ') : '<span class="muted">Sem exames vinculados</span>';
       const patientLabel = roomMode ? `Atendimento #${escapeHtml(visit.id.slice(0, 8))}` : escapeHtml(patient?.full_name || 'Paciente não visível');
@@ -527,6 +528,7 @@ async function renderOperationalModules(profile, userId) {
     const priorityButton = event.target.closest('.priority-toggle-button');
     const asoButton = event.target.closest('.aso-toggle-button');
     const sheetButton = event.target.closest('.patient-sheet-button');
+    const editPatientButton = event.target.closest('.edit-patient-button');
     const repeatCallButton = event.target.closest('.repeat-call-button');
     const cancelCallButton = event.target.closest('.cancel-call-button');
     if (sheetButton) {
@@ -538,6 +540,53 @@ async function renderOperationalModules(profile, userId) {
       document.body.append(dialog);
       if (typeof dialog.showModal === 'function') dialog.showModal(); else dialog.setAttribute('open', '');
       dialog.addEventListener('close', () => dialog.remove(), { once: true });
+      return;
+    }
+    if (editPatientButton) {
+      const patient = lastPatientsById.get(editPatientButton.dataset.patientId);
+      if (!patient) return;
+      const visitId = editPatientButton.dataset.visitId;
+      const { data: existingExams } = await supabase.from('visit_exams').select('exam_name').eq('visit_id', visitId);
+      const existingNames = new Set((existingExams || []).map((exam) => exam.exam_name));
+      const examMarkup = Object.entries(examCatalog).map(([roomName, exams]) => `<details class="exam-room-menu"><summary>${escapeHtml(roomName)} — exames disponíveis</summary><div class="service-options">${exams.map((exam) => `<label class="service-option"><input type="checkbox" name="edit_exam_names" data-room-name="${roomName}" value="${escapeHtml(exam)}" ${existingNames.has(exam) ? 'disabled' : ''}> ${escapeHtml(exam)} ${existingNames.has(exam) ? '<small>(já cadastrado)</small>' : ''}</label>`).join('')}</div></details>`).join('');
+      const dialog = document.createElement('dialog');
+      dialog.className = 'patient-sheet-dialog patient-edit-dialog';
+      dialog.innerHTML = `<form id="edit-patient-form"><div class="users-heading"><h2>Editar paciente / adicionar exames</h2><button type="button" class="secondary edit-dialog-close">Fechar</button></div><label>Nome completo *</label><input name="full_name" required maxlength="160" value="${escapeHtml(patient.full_name || '')}"><label>CPF</label><input name="cpf" inputmode="numeric" maxlength="11" value="${escapeHtml(patient.cpf || '')}"><label>Data de nascimento</label><input name="birth_date" type="date" value="${escapeHtml(patient.birth_date || '')}"><label>Empresa</label><input name="company_name" maxlength="160" value="${escapeHtml(patient.company_name || '')}"><label>Convênio / particular</label><input name="insurance" maxlength="100" value="${escapeHtml(patient.insurance || '')}"><label>Função / cargo</label><input name="job_title" maxlength="100" value="${escapeHtml(patient.job_title || '')}"><h3>Adicionar exames (os existentes serão preservados)</h3>${examMarkup}<label>Outros exames</label><textarea name="other_exam_names" rows="3" placeholder="Um exame por linha"></textarea><button class="submit" type="submit">Salvar alterações</button><p class="message" id="edit-patient-message" role="status"></p></form>`;
+      document.body.append(dialog);
+      const closeEdit = () => { if (dialog.open && typeof dialog.close === 'function') dialog.close(); else dialog.remove(); };
+      dialog.querySelector('.edit-dialog-close').addEventListener('click', closeEdit);
+      dialog.addEventListener('close', () => dialog.remove(), { once: true });
+      if (typeof dialog.showModal === 'function') dialog.showModal(); else dialog.setAttribute('open', '');
+      dialog.querySelector('#edit-patient-form').addEventListener('submit', async (submitEvent) => {
+        submitEvent.preventDefault();
+        const form = submitEvent.currentTarget;
+        const values = Object.fromEntries(new FormData(form).entries());
+        const status = dialog.querySelector('#edit-patient-message');
+        const save = form.querySelector('button[type="submit"]');
+        const cpf = String(values.cpf || '').replace(/\\D/g, '');
+        if (cpf && !/^\\d{11}$/.test(cpf)) { status.textContent = 'O CPF deve conter 11 números.'; status.className = 'message error'; return; }
+        save.disabled = true;
+        try {
+          const { error: patientUpdateError } = await supabase.from('patients').update({
+            full_name: String(values.full_name || '').trim(), cpf: cpf || null,
+            birth_date: values.birth_date || null, company_name: String(values.company_name || '').trim() || null,
+            insurance: String(values.insurance || '').trim() || null, job_title: String(values.job_title || '').trim() || null,
+          }).eq('id', patient.id);
+          if (patientUpdateError) throw patientUpdateError;
+          const { error: visitUpdateError } = await supabase.from('patient_visits').update({ company_name: String(values.company_name || '').trim() || null }).eq('id', visitId);
+          if (visitUpdateError) throw visitUpdateError;
+          const selected = [...form.querySelectorAll('input[name="edit_exam_names"]:checked')].map((input) => ({ name: input.value.trim(), roomName: input.dataset.roomName || '' }));
+          const other = String(values.other_exam_names || '').split(/[\\n,;]/).map((name) => name.trim()).filter(Boolean).map((name) => ({ name, roomName: '' }));
+          const additions = [...new Map(selected.concat(other).filter((exam) => exam.name && !existingNames.has(exam.name)).map((exam) => [exam.name, exam])).values()];
+          if (additions.length) {
+            const roomIdByName = new Map((roomResult.data || []).map((room) => [room.name, room.id]));
+            const { error: examsError } = await supabase.from('visit_exams').insert(additions.map((exam, index) => ({ visit_id: visitId, exam_name: exam.name, room_id: roomIdByName.get(exam.roomName) || null, display_order: (existingExams || []).length + index })));
+            if (examsError) throw examsError;
+          }
+          closeEdit();
+          await loadOperationalRows();
+        } catch (error) { status.textContent = error.message || 'Não foi possível salvar as alterações.'; status.className = 'message error'; save.disabled = false; }
+      });
       return;
     }
     try {
