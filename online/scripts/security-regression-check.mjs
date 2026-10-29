@@ -34,11 +34,12 @@ console.log('Security regression guardrails passed. Live RLS and session-revocat
 const operationalMigration = await readFile(new URL('../supabase/migrations/20261029150000_operational_foundation.sql', import.meta.url), 'utf8');
 assert.match(frontend, /renderOperationalModules\(profile, userId\)/);
 assert.match(frontend, /patient-checkin-form/);
+assert.match(frontend, /room-setup-form/);
 assert.match(frontend, /visit_exams/);
 assert.match(operationalMigration, /alter table public\.patients enable row level security/);
 assert.match(operationalMigration, /alter table public\.patient_visits force row level security/);
 assert.match(operationalMigration, /security definer/);
-assert.match(operationalMigration, /profiles_select_professional_directory/);
+assert.match(operationalMigration, /profiles_select_staff_directory/);
 assert.match(operationalMigration, /visit_exams_update_room/);
 assert.match(operationalMigration, /grant update \(status, result_summary, completed_by, completed_at, display_order, updated_at\) on public\.visit_exams/);
 assert.match(operationalMigration, /grant update \(visit_date, attendance_type, status, company_name, professional_id, room_id, started_at, completed_at, updated_at\) on public\.patient_visits/);
