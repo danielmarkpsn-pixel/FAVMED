@@ -47,9 +47,16 @@ assert.ok(operationalMigration.includes('grant update (status, result_summary, d
 assert.ok(!operationalMigration.includes('grant update (status, result_summary, completed_by'));
 assert.ok(operationalMigration.includes('create or replace function private.set_visit_exam_completion'));
 assert.ok(operationalMigration.includes('new.completed_by := (select auth.uid());'));
-assert.ok(frontend.includes('payload.completed_at = new Date().toISOString()'));
+assert.ok(!frontend.includes('payload.completed_at = new Date().toISOString()'));
+assert.ok(!frontend.includes('payload.started_at = new Date().toISOString()'));
 assert.ok(!frontend.includes('payload.completed_by = userId'));
 assert.match(operationalMigration, /grant update \(visit_date, attendance_type, status, company_name, professional_id, room_id, started_at, completed_at, updated_at\) on public\.patient_visits/);
 assert.match(operationalMigration, /create policy patients_select_authorized/);
+const integrityMigration = await readFile(new URL('../supabase/migrations/20261029195000_visit_timestamp_integrity.sql', import.meta.url), 'utf8');
+assert.match(integrityMigration, /create or replace function private\.set_patient_visit_timestamps/);
+assert.match(integrityMigration, /revoke update \\(started_at, completed_at\\) on public\\.patient_visits from authenticated/);
+assert.match(integrityMigration, /create or replace function private\.set_audit_created_by/);
+assert.match(integrityMigration, /patients_created_by_idx/);
+assert.match(integrityMigration, /patient_visits_created_by_idx/);
 assert.match(operationalMigration, /create policy patient_visits_update_professional/);
 assert.match(operationalMigration, /create policy visit_exams_update_professional/);
