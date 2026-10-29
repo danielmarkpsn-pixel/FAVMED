@@ -20,6 +20,11 @@ assert.match(edge, /INVITE_EMAIL_EXISTS/);
 assert.match(edge, /set_active/);
 assert.match(frontend, /response\.clone\(\)\.json\(\)/);
 assert.match(frontend, /profile\.active !== true/);
+// Password recovery must be recognized through Supabase's auth event too,
+// because PKCE links can carry only ?code=... and omit type=recovery.
+assert.match(frontend, /event === 'PASSWORD_RECOVERY'/);
+assert.match(frontend, /passwordRecoveryInProgress \|\| isInvite \|\| isRecovery/);
+assert.match(frontend, /renderPasswordUpdate\(true\)/);
 
 // Patient data must never be committed to the legacy local queue file.
 assert.deepEqual(JSON.parse(queueFile), [], 'fila.json must remain empty in the repository; use synthetic fixtures outside tracked production data.');
