@@ -563,8 +563,8 @@ async function renderOperationalModules(profile, userId) {
         const values = Object.fromEntries(new FormData(form).entries());
         const status = dialog.querySelector('#edit-patient-message');
         const save = form.querySelector('button[type="submit"]');
-        const cpf = String(values.cpf || '').replace(/\\D/g, '');
-        if (cpf && !/^\\d{11}$/.test(cpf)) { status.textContent = 'O CPF deve conter 11 números.'; status.className = 'message error'; return; }
+        const cpf = String(values.cpf || '').replace(/\D/g, '');
+        if (cpf && !/^\d{11}$/.test(cpf)) { status.textContent = 'O CPF deve conter 11 números.'; status.className = 'message error'; return; }
         save.disabled = true;
         try {
           const { error: patientUpdateError } = await supabase.from('patients').update({
