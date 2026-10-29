@@ -56,3 +56,10 @@ Consulte [MASTER-BOOTSTRAP.md](supabase/MASTER-BOOTSTRAP.md) e [SCHEMA-RECONCILI
 - Configurar a Vercel somente depois de validar a integração.
 
 O sistema continua sendo um protótipo de autenticação. O schema verificado contém apenas `public.profiles`; pacientes, fila, atendimentos, profissionais e salas ainda não estão integrados ao banco. Não liberar módulos operacionais nem usar dados reais de pacientes até concluir os testes de segurança.
+
+
+## Implementação operacional em revisão (branch de funcionalidade)
+
+A branch `feature/favmed-online-operational-modules` contém uma primeira interface para cadastro de pacientes e entrada na fila, atribuição de profissional/sala, visualização por perfil e atualização de status de atendimentos/exames. O perfil Master também pode cadastrar salas e vincular contas de sala. A migração aditiva `20261029150000_operational_foundation.sql` cria as tabelas operacionais e políticas/grants restritivos.
+
+Esta implementação ainda não está liberada na `main` nem implantada no Supabase remoto. A compilação do preview não substitui os testes de integração RLS com contas separadas (Master, recepção, profissional, sala e usuário inativo). Não usar dados reais nem mesclar/aplicar a migração antes dessas validações. O cadastro de paciente e atendimento usa múltiplas chamadas REST, não uma transação atômica; se uma etapa falhar, a interface informa em qual etapa ocorreu a falha e pode ser necessária reconciliação manual.

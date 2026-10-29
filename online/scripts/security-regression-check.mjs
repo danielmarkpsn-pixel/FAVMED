@@ -30,3 +30,26 @@ assert.match(frontend, /renderPasswordUpdate\(true\)/);
 assert.deepEqual(JSON.parse(queueFile), [], 'fila.json must remain empty in the repository; use synthetic fixtures outside tracked production data.');
 
 console.log('Security regression guardrails passed. Live RLS and session-revocation tests remain required.');
+
+const operationalMigration = await readFile(new URL('../supabase/migrations/20261029150000_operational_foundation.sql', import.meta.url), 'utf8');
+assert.match(frontend, /renderOperationalModules\(profile, userId\)/);
+assert.match(frontend, /patient-checkin-form/);
+assert.match(frontend, /room-setup-form/);
+assert.match(frontend, /visit_exams/);
+assert.match(operationalMigration, /alter table public\.patients enable row level security/);
+assert.match(operationalMigration, /alter table public\.patient_visits force row level security/);
+assert.match(operationalMigration, /security definer/);
+assert.match(operationalMigration, /profiles_select_staff_directory/);
+assert.match(operationalMigration, /room_type text not null default 'outro'/);
+assert.doesNotMatch(operationalMigration, /room_type text not null default 'atendimento'/);
+assert.match(operationalMigration, /visit_exams_update_room/);
+assert.ok(operationalMigration.includes('grant update (status, result_summary, display_order, updated_at) on public.visit_exams to authenticated;'));
+assert.ok(!operationalMigration.includes('grant update (status, result_summary, completed_by'));
+assert.ok(operationalMigration.includes('create or replace function private.set_visit_exam_completion'));
+assert.ok(operationalMigration.includes('new.completed_by := (select auth.uid());'));
+assert.ok(frontend.includes('payload.completed_at = new Date().toISOString()'));
+assert.ok(!frontend.includes('payload.completed_by = userId'));
+assert.match(operationalMigration, /grant update \(visit_date, attendance_type, status, company_name, professional_id, room_id, started_at, completed_at, updated_at\) on public\.patient_visits/);
+assert.match(operationalMigration, /create policy patients_select_authorized/);
+assert.match(operationalMigration, /create policy patient_visits_update_professional/);
+assert.match(operationalMigration, /create policy visit_exams_update_professional/);

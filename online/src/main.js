@@ -197,6 +197,298 @@ function renderUserRows(users) {
     </tr>`).join('');
 }
 
+
+const operationalStatuses = {
+  aguardando: 'Aguardando',
+  em_atendimento: 'Em atendimento',
+  atendido: 'Atendido',
+  cancelado: 'Cancelado',
+};
+const defaultExams = ['ASO', 'Audiometria', 'Acuidade visual', 'Espirometria', 'Eletrocardiograma', 'Teste Ergonométrico', 'Acetona na Urina', 'Acuidade com percepção de cores'];
+
+function operationalMessage(target, message, isError = false) {
+  const node = document.querySelector(target);
+  if (!node) return;
+  node.textContent = message;
+  node.className = isError ? 'message error' : 'message';
+}
+
+async function renderOperationalModules(profile, userId) {
+  const panel = document.querySelector('#operational-panel');
+  if (!panel) return;
+  const canRegister = ['master', 'recepcao'].includes(profile.role);
+  panel.innerHTML = `
+    <div class="operational-heading">
+      <div><p class="eyebrow">OPERAÇÃO CLÍNICA</p><h2>Módulos operacionais</h2></div>
+      <button class="secondary" id="refresh-operational" type="button">Atualizar dados</button>
+    </div>
+    ${canRegister ? `
+      <section class="module-card">
+        <h3>Recepção · Cadastrar paciente e atendimento</h3>
+        <p class="muted">Cadastre o paciente, registre a entrada na fila e associe os exames solicitados.</p>
+        <form id="patient-checkin-form" class="operational-form">
+          <div class="form-grid">
+            <div><label for="patient-name">Nome completo *</label><input id="patient-name" name="full_name" required maxlength="160" autocomplete="name"></div>
+            <div><label for="patient-cpf">CPF (somente números)</label><input id="patient-cpf" name="cpf" inputmode="numeric" pattern="[0-9]{11}" maxlength="11" placeholder="11 dígitos"></div>
+            <div><label for="patient-birth">Data de nascimento</label><input id="patient-birth" name="birth_date" type="date"></div>
+            <div><label for="patient-company">Empresa</label><input id="patient-company" name="company_name" maxlength="160"></div>
+            <div><label for="visit-type">Tipo de atendimento</label><select id="visit-type" name="attendance_type"><option>Pontual</option><option>Consulta Ocupacional</option><option>Agendado</option></select></div>
+            <div><label for="visit-professional">Profissional</label><select id="visit-professional" name="professional_id"><option value="">A definir</option></select></div>
+            <div><label for="visit-room">Sala inicial</label><select id="visit-room" name="room_id"><option value="">A definir</option></select></div>
+          </div>
+          <label for="visit-exams">Exames solicitados (um por linha)</label>
+          <textarea id="visit-exams" name="exam_names" rows="4" placeholder="${defaultExams.join(', ')}"></textarea>
+          <button class="submit" id="checkin-submit" type="submit">Cadastrar e colocar na fila</button>
+          <p id="checkin-message" class="message" role="status"></p>
+        </form>
+      </section>` : ''}
+
+    ${profile.role === 'master' ? `
+      <section class="module-card">
+        <h3>Master · Configurar salas</h3>
+        <p class="muted">Crie as salas e associe cada conta do perfil Sala de espera à sua sala.</p>
+        <form id="room-setup-form" class="operational-form">
+          <div class="form-grid">
+            <div><label for="room-name">Nome da sala *</label><input id="room-name" name="name" required maxlength="80" placeholder="Ex.: Audiometria"></div>
+            <div><label for="room-type">Tipo</label><select id="room-type" name="room_type"><option value="exame">Exame</option><option value="consulta">Consulta</option><option value="recepcao">Recepção</option><option value="espera">Espera</option><option value="outro">Outro</option></select></div>
+            <div><label for="room-assigned-profile">Conta vinculada</label><select id="room-assigned-profile" name="assigned_profile_id"><option value="">Sem vínculo</option></select></div>
+          </div>
+          <button class="submit" id="room-create-submit" type="submit">Salvar sala</button>
+          <p id="room-setup-message" class="message" role="status"></p>
+        </form>
+        <div class="table-wrap"><table class="users-table"><thead><tr><th>Sala</th><th>Tipo</th><th>Conta vinculada</th><th>Status</th></tr></thead><tbody id="room-list-rows"><tr><td colspan="4">Carregando salas…</td></tr></tbody></table></div>
+      </section>` : ''}
+    <section class="module-card">
+      <div class="users-heading"><h3>${profile.role === 'sala' ? 'Exames desta sala' : profile.role === 'profissional' ? 'Minha fila de atendimentos' : 'Fila e atendimentos'}</h3><span class="muted" id="operational-count"></span></div>
+      <div class="table-wrap"><table class="users-table operational-table">
+        <thead><tr><th>Paciente / Atendimento</th><th>Exames</th><th>Status</th><th>Ação</th></tr></thead>
+        <tbody id="operational-rows"><tr><td colspan="4">Carregando dados…</td></tr></tbody>
+      </table></div>
+      <p id="operational-message" class="message" role="status"></p>
+    </section>`;
+
+  const professionalSelect = document.querySelector('#visit-professional');
+  const roomSelect = document.querySelector('#visit-room');
+  const roomAssignedSelect = document.querySelector('#room-assigned-profile');
+  let roomUsers = [];
+  if (roomAssignedSelect) {
+    const { data: fetchedRoomUsers, error: roomUsersError } = await supabase.from('profiles')
+      .select('id, display_name').eq('role', 'sala').eq('active', true).order('display_name');
+    if (!roomUsersError) {
+      roomUsers = fetchedRoomUsers || [];
+      roomAssignedSelect.innerHTML = '<option value="">Sem vínculo</option>' + roomUsers.map((u) => `<option value="${escapeHtml(u.id)}">${escapeHtml(u.display_name || 'Sala de espera')}</option>`).join('');
+    }
+  }
+  if (profile.role === 'master') {
+    const { data: savedRooms, error: savedRoomsError } = await supabase.from('rooms')
+      .select('id, name, room_type, assigned_profile_id, active').order('display_order').order('name');
+    const roomRows = document.querySelector('#room-list-rows');
+    if (roomRows) roomRows.innerHTML = savedRoomsError
+      ? '<tr><td colspan="4">Não foi possível carregar as salas.</td></tr>'
+      : (savedRooms || []).map((room) => {
+        const assigned = (roomUsers || []).find((u) => u.id === room.assigned_profile_id);
+        return `<tr><td>${escapeHtml(room.name)}</td><td>${escapeHtml(room.room_type)}</td><td>${escapeHtml(assigned?.display_name || (room.assigned_profile_id ? 'Conta vinculada' : 'Sem vínculo'))}</td><td><span class="status-pill ${room.active ? 'active' : 'inactive'}">${room.active ? 'Ativa' : 'Inativa'}</span></td></tr>`;
+      }).join('') || '<tr><td colspan="4">Nenhuma sala cadastrada.</td></tr>';
+    const roomForm = document.querySelector('#room-setup-form');
+    roomForm?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const button = document.querySelector('#room-create-submit');
+      const values = Object.fromEntries(new FormData(form).entries());
+      button.disabled = true;
+      try {
+        const { error } = await supabase.from('rooms').insert({
+          name: String(values.name || '').trim(),
+          room_type: values.room_type,
+          assigned_profile_id: values.assigned_profile_id || null,
+        });
+        if (error) throw error;
+        operationalMessage('#room-setup-message', 'Sala cadastrada.');
+        await renderOperationalModules(profile, userId);
+      } catch (error) {
+        operationalMessage('#room-setup-message', error.message || 'Não foi possível cadastrar a sala.', true);
+        button.disabled = false;
+      }
+    });
+  }
+  const [professionalResult, roomResult] = await Promise.all([
+    supabase.from('profiles').select('id, display_name').eq('role', 'profissional').eq('active', true).order('display_name'),
+    supabase.from('rooms').select('id, name').eq('active', true).order('display_order').order('name'),
+  ]);
+  if (professionalSelect && !professionalResult.error) {
+    professionalSelect.innerHTML = '<option value="">A definir</option>' + (professionalResult.data || []).map((p) => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.display_name || 'Profissional')}</option>`).join('');
+  }
+  if (roomSelect && !roomResult.error) {
+    roomSelect.innerHTML = '<option value="">A definir</option>' + (roomResult.data || []).map((r) => `<option value="${escapeHtml(r.id)}">${escapeHtml(r.name)}</option>`).join('');
+  }
+
+  async function loadOperationalRows() {
+    const rows = document.querySelector('#operational-rows');
+    if (!rows) return;
+    rows.innerHTML = '<tr><td colspan="4">Carregando dados…</td></tr>';
+    let visitsQuery = supabase.from('patient_visits')
+      .select('id, patient_id, visit_date, attendance_type, status, professional_id, room_id, checked_in_at')
+      .order('checked_in_at', { ascending: false }).limit(100);
+    let assignedRoomId = '';
+    if (profile.role === 'profissional') visitsQuery = visitsQuery.eq('professional_id', userId);
+    if (profile.role === 'sala') {
+      const { data: assignedRoom, error: assignedRoomError } = await supabase.from('rooms')
+        .select('id').eq('assigned_profile_id', userId).eq('active', true).maybeSingle();
+      if (assignedRoomError || !assignedRoom) {
+        rows.innerHTML = '<tr><td colspan="4">Nenhuma sala ativa está vinculada a esta conta. Solicite a configuração ao Master.</td></tr>';
+        return;
+      }
+      assignedRoomId = assignedRoom.id;
+      const { data: exams, error: examsError } = await supabase.from('visit_exams')
+        .select('id, visit_id, exam_name, status, room_id, display_order')
+        .eq('room_id', assignedRoomId).in('status', ['pendente', 'em_atendimento'])
+        .order('display_order').limit(100);
+      if (examsError) {
+        rows.innerHTML = '<tr><td colspan="4">Não foi possível carregar os exames. Verifique a migração e as permissões.</td></tr>';
+        return;
+      }
+      const visitIds = [...new Set((exams || []).map((exam) => exam.visit_id))];
+      let visits = [];
+      if (visitIds.length) {
+        const { data, error } = await supabase.from('patient_visits')
+          .select('id, patient_id, visit_date, attendance_type, status, checked_in_at')
+          .in('id', visitIds).order('checked_in_at', { ascending: false });
+        if (error) { rows.innerHTML = '<tr><td colspan="4">Não foi possível carregar a fila desta sala.</td></tr>'; return; }
+        visits = data || [];
+      }
+      return renderRows(visits, exams || [], true);
+    }
+    const { data: visits, error } = await visitsQuery;
+    if (error) {
+      rows.innerHTML = '<tr><td colspan="4">Não foi possível carregar a fila. Verifique se a migração operacional foi aplicada e se as políticas RLS estão ativas.</td></tr>';
+      return;
+    }
+    const visitIds = (visits || []).map((visit) => visit.id);
+    const patientIds = [...new Set((visits || []).map((visit) => visit.patient_id))];
+    const [patientsResult, examsResult] = await Promise.all([
+      patientIds.length ? supabase.from('patients').select('id, full_name, company_name').in('id', patientIds) : Promise.resolve({ data: [], error: null }),
+      visitIds.length ? supabase.from('visit_exams').select('id, visit_id, exam_name, status, room_id, display_order').in('visit_id', visitIds).order('display_order') : Promise.resolve({ data: [], error: null }),
+    ]);
+    if (patientsResult.error || examsResult.error) {
+      rows.innerHTML = '<tr><td colspan="4">Os dados foram parcialmente bloqueados pelas políticas de segurança. Revise a RLS antes de continuar.</td></tr>';
+      return;
+    }
+    renderRows(visits || [], examsResult.data || [], false, patientsResult.data || []);
+  }
+
+  function renderRows(visits, exams, roomMode, patients = []) {
+    const rows = document.querySelector('#operational-rows');
+    const count = document.querySelector('#operational-count');
+    if (!rows) return;
+    count.textContent = `${visits.length} atendimento(s)`;
+    if (!visits.length) {
+      rows.innerHTML = '<tr><td colspan="4">Nenhum atendimento encontrado.</td></tr>';
+      return;
+    }
+    const patientMap = new Map(patients.map((patient) => [patient.id, patient]));
+    rows.innerHTML = visits.map((visit) => {
+      const patient = patientMap.get(visit.patient_id);
+      const visitExams = exams.filter((exam) => exam.visit_id === visit.id);
+      const status = roomMode ? (visitExams.some((exam) => exam.status === 'em_atendimento') ? 'em_atendimento' : (visitExams.every((exam) => exam.status === 'realizado') ? 'atendido' : 'aguardando')) : visit.status;
+      const action = roomMode
+        ? visitExams.map((exam) => `<button type="button" class="secondary exam-status-button" data-exam-id="${escapeHtml(exam.id)}" data-next-status="${exam.status === 'pendente' ? 'em_atendimento' : 'realizado'}">${escapeHtml(exam.exam_name)}: ${exam.status === 'pendente' ? 'Iniciar' : 'Marcar realizado'}</button>`).join(' ')
+        : (profile.role === 'profissional'
+          ? `<button type="button" class="secondary visit-status-button" data-visit-id="${escapeHtml(visit.id)}" data-next-status="${visit.status === 'aguardando' ? 'em_atendimento' : 'atendido'}">${visit.status === 'aguardando' ? 'Iniciar atendimento' : visit.status === 'em_atendimento' ? 'Concluir atendimento' : 'Atualizar status'}</button>`
+          : '');
+      const examLabels = visitExams.length ? visitExams.map((exam) => `<span class="exam-pill">${escapeHtml(exam.exam_name)} · ${escapeHtml(exam.status)}</span>`).join(' ') : '<span class="muted">Sem exames vinculados</span>';
+      const patientLabel = roomMode ? `Atendimento #${escapeHtml(visit.id.slice(0, 8))}` : escapeHtml(patient?.full_name || 'Paciente não visível');
+      const company = patient?.company_name ? `<br><small>${escapeHtml(patient.company_name)}</small>` : '';
+      return `<tr><td><strong>${patientLabel}</strong>${company}<br><small>${escapeHtml(visit.attendance_type)} · ${escapeHtml(visit.visit_date)}</small></td><td>${examLabels}</td><td><span class="status-pill ${status === 'atendido' ? 'active' : status === 'cancelado' ? 'inactive' : ''}">${escapeHtml(operationalStatuses[status] || status)}</span></td><td>${action || '<span class="muted">—</span>'}</td></tr>`;
+    }).join('');
+  }
+
+  if (canRegister) {
+    document.querySelector('#patient-checkin-form').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const button = document.querySelector('#checkin-submit');
+      const values = Object.fromEntries(new FormData(form).entries());
+      const cpf = String(values.cpf || '').replace(/\D/g, '');
+      if (cpf && !/^\d{11}$/.test(cpf)) {
+        operationalMessage('#checkin-message', 'O CPF deve conter exatamente 11 números.', true);
+        return;
+      }
+      const examNames = String(values.exam_names || '').split(/[\n,;]/).map((name) => name.trim()).filter(Boolean);
+      button.disabled = true;
+      button.textContent = 'Salvando cadastro…';
+      operationalMessage('#checkin-message', '');
+      try {
+        const { data: patient, error: patientError } = await supabase.from('patients').insert({
+          full_name: String(values.full_name || '').trim(),
+          cpf: cpf || null,
+          birth_date: values.birth_date || null,
+          company_name: String(values.company_name || '').trim() || null,
+          created_by: userId,
+        }).select('id').single();
+        if (patientError) throw patientError;
+        const { data: visit, error: visitError } = await supabase.from('patient_visits').insert({
+          patient_id: patient.id,
+          attendance_type: values.attendance_type,
+          professional_id: values.professional_id || null,
+          room_id: values.room_id || null,
+          company_name: String(values.company_name || '').trim() || null,
+          created_by: userId,
+        }).select('id').single();
+        if (visitError) throw new Error(`Paciente salvo, mas não foi possível abrir o atendimento: ${visitError.message}`);
+        if (examNames.length) {
+          const examRows = examNames.map((exam_name, index) => ({
+            visit_id: visit.id, exam_name, room_id: values.room_id || null, display_order: index,
+          }));
+          const { error: examError } = await supabase.from('visit_exams').insert(examRows);
+          if (examError) throw new Error(`Atendimento criado, mas não foi possível salvar os exames: ${examError.message}`);
+        }
+        form.reset();
+        operationalMessage('#checkin-message', 'Paciente cadastrado e atendimento enviado à fila.');
+        await loadOperationalRows();
+      } catch (error) {
+        operationalMessage('#checkin-message', error.message || 'Não foi possível cadastrar o atendimento.', true);
+      } finally {
+        button.disabled = false;
+        button.textContent = 'Cadastrar e colocar na fila';
+      }
+    });
+  }
+
+  document.querySelector('#refresh-operational').addEventListener('click', loadOperationalRows);
+  document.querySelector('#operational-rows').addEventListener('click', async (event) => {
+    const examButton = event.target.closest('.exam-status-button');
+    const visitButton = event.target.closest('.visit-status-button');
+    try {
+      if (examButton) {
+        examButton.disabled = true;
+        const nextStatus = examButton.dataset.nextStatus;
+        const payload = { status: nextStatus, updated_at: new Date().toISOString() };
+        if (nextStatus === 'realizado') {
+        }
+        const { error } = await supabase.from('visit_exams').update(payload).eq('id', examButton.dataset.examId);
+        if (error) throw error;
+        operationalMessage('#operational-message', 'Status do exame atualizado.');
+        await loadOperationalRows();
+      } else if (visitButton) {
+        visitButton.disabled = true;
+        const nextStatus = visitButton.dataset.nextStatus;
+        const payload = { status: nextStatus, updated_at: new Date().toISOString() };
+        if (nextStatus === 'em_atendimento') payload.started_at = new Date().toISOString();
+        if (nextStatus === 'atendido') payload.completed_at = new Date().toISOString();
+        const { error } = await supabase.from('patient_visits').update(payload).eq('id', visitButton.dataset.visitId);
+        if (error) throw error;
+        operationalMessage('#operational-message', 'Status do atendimento atualizado.');
+        await loadOperationalRows();
+      }
+    } catch (error) {
+      operationalMessage('#operational-message', error.message || 'Não foi possível atualizar o status.', true);
+      if (examButton) examButton.disabled = false;
+      if (visitButton) visitButton.disabled = false;
+    }
+  });
+  await loadOperationalRows();
+}
+
 function renderHome(profile, userId) {
   const label = roleLabels[profile.role];
   const isMaster = profile.role === 'master';
@@ -230,8 +522,8 @@ function renderHome(profile, userId) {
               <thead><tr><th>Usuário</th><th>Perfil</th><th>Status</th><th>Ação</th></tr></thead>
               <tbody id="users-body"><tr><td colspan="4">Carregando contas…</td></tr></tbody>
             </table></div>
-          </section>` : `
-          <div class="notice">O acesso foi validado. Os módulos operacionais serão habilitados após a implantação e validação das tabelas e políticas de segurança do banco.</div>`}
+          </section>` : ``}
+        <section id="operational-panel" class="operational-panel" aria-label="Módulos operacionais"></section>
         <button class="secondary" id="sign-out" type="button">Sair da conta</button>
       </section>
       <footer>FAVMED Online · Acesso restrito à Clínica Favmed</footer>
@@ -242,6 +534,7 @@ function renderHome(profile, userId) {
     renderLogin('Você saiu da sua conta.');
   });
 
+  renderOperationalModules(profile, userId);
   if (!isMaster) return;
   const adminMessage = document.querySelector('#admin-message');
   const usersBody = document.querySelector('#users-body');

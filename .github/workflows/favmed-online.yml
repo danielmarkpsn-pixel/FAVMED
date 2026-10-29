@@ -34,7 +34,7 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-      - name: Check JavaScript syntax
+      - name: Check JavaScript syntax and security regression guardrails
         run: npm run check
       - name: Setup Deno
         uses: denoland/setup-deno@v2
