@@ -50,6 +50,7 @@ function renderLogin(message = '', isError = false) {
           <button class="reveal" id="toggle-password" type="button" aria-label="Mostrar senha">Mostrar</button>
         </div>
         <button class="submit" id="submit-button" type="submit">Entrar com segurança</button>
+        <button class="secondary" id="recover-password" type="button">Esqueci minha senha</button>
         <p id="form-message" class="message ${isError ? 'error' : ''}" role="status">${escapeHtml(message)}</p>
       </form>
       <p class="footnote">A criação de contas é restrita ao administrador Master. Não há cadastro público.</p>
@@ -64,6 +65,33 @@ function renderLogin(message = '', isError = false) {
     input.type = showing ? 'password' : 'text';
     document.querySelector('#toggle-password').textContent = showing ? 'Mostrar' : 'Ocultar';
     document.querySelector('#toggle-password').setAttribute('aria-label', showing ? 'Mostrar senha' : 'Ocultar senha');
+  });
+
+  document.querySelector('#recover-password').addEventListener('click', async () => {
+    const email = document.querySelector('#email').value.trim();
+    if (!email) {
+      status.textContent = 'Informe seu e-mail para receber o link de redefinição.';
+      status.className = 'message error';
+      document.querySelector('#email').focus();
+      return;
+    }
+    const recoverButton = document.querySelector('#recover-password');
+    recoverButton.disabled = true;
+    status.textContent = 'Enviando link de redefinição…';
+    status.className = 'message';
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + window.location.pathname,
+      });
+      if (error) throw error;
+      status.textContent = 'Se o e-mail estiver cadastrado, você receberá um link para criar uma nova senha.';
+      status.className = 'message';
+    } catch (error) {
+      status.textContent = error.message || 'Não foi possível enviar o link. Tente novamente.';
+      status.className = 'message error';
+    } finally {
+      recoverButton.disabled = false;
+    }
   });
 
   form.addEventListener('submit', async (event) => {
@@ -98,11 +126,19 @@ function renderLogin(message = '', isError = false) {
   });
 }
 
-function renderInvitePassword() {
-  root.innerHTML = '<main class="shell"><section class="login-card"><div class="brand-mark" aria-hidden="true">F</div><p class="eyebrow">CLÍNICA FAVMED</p><h1>Concluir seu acesso</h1><p class="muted">Defina uma senha para concluir o convite.</p><form id="invite-password-form"><label for="invite-password">Nova senha</label><input id="invite-password" name="password" type="password" minlength="8" autocomplete="new-password" required><label for="invite-password-confirm">Confirmar nova senha</label><input id="invite-password-confirm" name="confirm_password" type="password" minlength="8" autocomplete="new-password" required><button class="submit" id="invite-submit" type="submit">Salvar senha e concluir</button><p id="invite-message" class="message" role="status"></p></form></section><footer>FAVMED Online · Acesso restrito à Clínica Favmed</footer></main>';
-  const form = document.querySelector('#invite-password-form');
-  const button = document.querySelector('#invite-submit');
-  const status = document.querySelector('#invite-message');
+function renderPasswordUpdate(isRecovery = false) {
+  const heading = isRecovery ? 'Redefinir senha' : 'Concluir seu acesso';
+  const description = isRecovery
+    ? 'Crie uma nova senha para voltar a acessar o FAVMED.'
+    : 'Defina uma senha para concluir o convite.';
+  const submitLabel = isRecovery ? 'Salvar nova senha' : 'Salvar senha e concluir';
+  const expiredMessage = isRecovery
+    ? 'O link de recuperação expirou ou já foi utilizado. Solicite outro link e tente novamente.'
+    : 'O convite expirou ou já foi utilizado. Solicite um novo convite ao administrador.';
+  root.innerHTML = `<main class="shell"><section class="login-card"><div class="brand-mark" aria-hidden="true">F</div><p class="eyebrow">CLÍNICA FAVMED</p><h1>${heading}</h1><p class="muted">${description}</p><form id="update-password-form"><label for="new-password">Nova senha</label><input id="new-password" name="password" type="password" minlength="8" autocomplete="new-password" required><label for="confirm-new-password">Confirmar nova senha</label><input id="confirm-new-password" name="confirm_password" type="password" minlength="8" autocomplete="new-password" required><button class="submit" id="update-password-submit" type="submit">${submitLabel}</button><p id="update-password-message" class="message" role="status"></p></form></section><footer>FAVMED Online · Acesso restrito à Clínica Favmed</footer></main>`;
+  const form = document.querySelector('#update-password-form');
+  const button = document.querySelector('#update-password-submit');
+  const status = document.querySelector('#update-password-message');
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     const values = Object.fromEntries(new FormData(form).entries());
@@ -112,7 +148,7 @@ function renderInvitePassword() {
     button.disabled = true; button.textContent = 'Salvando senha…';
     try {
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError || !sessionData.session?.user) throw new Error('O convite expirou ou já foi utilizado. Solicite um novo convite ao administrador.');
+      if (sessionError || !sessionData.session?.user) throw new Error(expiredMessage);
       const { error: updateError } = await supabase.auth.updateUser({ password });
       if (updateError) throw updateError;
       const user = sessionData.session.user;
@@ -120,7 +156,7 @@ function renderInvitePassword() {
       if (profileError || !profile || profile.active !== true || !roleLabels[profile.role]) { await supabase.auth.signOut(); throw new Error('A conta não possui perfil autorizado ou está inativa. Contate o administrador Master.'); }
       window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
       renderHome(profile, user.id);
-    } catch (error) { status.textContent = error.message || 'Não foi possível concluir o convite.'; status.className = 'message error'; button.disabled = false; button.textContent = 'Salvar senha e concluir'; }
+    } catch (error) { status.textContent = error.message || 'Não foi possível atualizar a senha.'; status.className = 'message error'; button.disabled = false; button.textContent = submitLabel; }
   });
 }
 async function callMasterAction(body) {
@@ -268,12 +304,18 @@ function renderHome(profile, userId) {
 
 async function start() {
   if (!configured) return renderSetup();
-  const isInvite = new URLSearchParams(window.location.hash.slice(1)).get('type') === 'invite';
+  const authParams = new URLSearchParams(window.location.hash.slice(1));
+  const authType = authParams.get('type');
+  const isInvite = authType === 'invite';
+  const isRecovery = authType === 'recovery';
   const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-  if (sessionError) return renderLogin('Não foi possível validar o link. Solicite um novo convite ao administrador.', true);
-  if (isInvite) {
-    if (session?.user) return renderInvitePassword();
-    return renderLogin('O convite expirou ou já foi utilizado. Solicite um novo convite ao administrador.', true);
+  if (sessionError) return renderLogin('Não foi possível validar o link. Solicite um novo link e tente novamente.', true);
+  if (isInvite || isRecovery) {
+    if (session?.user) return renderPasswordUpdate(isRecovery);
+    const message = isRecovery
+      ? 'O link de recuperação expirou ou já foi utilizado. Solicite outro link para redefinir a senha.'
+      : 'O convite expirou ou já foi utilizado. Solicite um novo convite ao administrador.';
+    return renderLogin(message, true);
   }
   if (!session?.user) return renderLogin();
   const { data: profile, error } = await supabase.from('profiles')
