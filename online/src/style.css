@@ -108,3 +108,28 @@ select:focus { outline: 3px solid #087f8c20; border-color: var(--teal); }
   .users-table th, .users-table td { padding: 9px 7px; }
   .users-table small { max-width: 130px; }
 }
+
+
+/* FAVMED Online operational modules */
+.operational-panel { margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--line); }
+.operational-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.operational-heading .eyebrow { margin-top: 0; }
+.operational-heading h2 { margin: 0; font-size: 22px; }
+.module-card { margin-top: 18px; padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: #fcfefe; }
+.module-card h3 { margin: 0; font-size: 16px; }
+.module-card > .muted { margin: 8px 0 18px; }
+.operational-form { max-width: none; }
+.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 16px; }
+.form-grid > div { min-width: 0; }
+textarea { width: 100%; min-height: 90px; padding: 12px 13px; border: 1px solid #cbdadd; border-radius: 10px; color: #20313a; font: inherit; resize: vertical; }
+textarea:focus { outline: 3px solid #087f8c20; border-color: var(--teal); }
+.exam-pill { display: inline-block; margin: 2px 2px 2px 0; padding: 4px 7px; border-radius: 7px; background: #edf5f6; color: #3d5c65; font-size: 11px; }
+.operational-table td { min-width: 100px; }
+.operational-table td:nth-child(2) { min-width: 180px; }
+.operational-table td:last-child { min-width: 160px; }
+.operational-table .secondary { margin: 2px; }
+@media (max-width: 640px) {
+  .operational-heading { align-items: flex-start; flex-direction: column; }
+  .module-card { padding: 14px 10px; }
+  .form-grid { grid-template-columns: 1fr; }
+}
