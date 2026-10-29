@@ -228,17 +228,32 @@ async function renderOperationalModules(profile, userId) {
         <h3>Recepção · Cadastrar paciente e atendimento</h3>
         <p class="muted">Cadastre o paciente, registre a entrada na fila e associe os exames solicitados.</p>
         <form id="patient-checkin-form" class="operational-form">
-          <div class="form-grid">
-            <div><label for="patient-name">Nome completo *</label><input id="patient-name" name="full_name" required maxlength="160" autocomplete="name"></div>
-            <div><label for="patient-cpf">CPF (somente números)</label><input id="patient-cpf" name="cpf" inputmode="numeric" pattern="[0-9]{11}" maxlength="11" placeholder="11 dígitos"></div>
-            <div><label for="patient-birth">Data de nascimento</label><input id="patient-birth" name="birth_date" type="date"></div>
-            <div><label for="patient-company">Empresa</label><input id="patient-company" name="company_name" maxlength="160"></div>
-            <div><label for="visit-type">Tipo de atendimento</label><select id="visit-type" name="attendance_type"><option>Pontual</option><option>Consulta Ocupacional</option><option>Agendado</option></select></div>
-            <div><label for="visit-professional">Profissional</label><select id="visit-professional" name="professional_id"><option value="">A definir</option></select></div>
-            <div><label for="visit-room">Sala inicial</label><select id="visit-room" name="room_id"><option value="">A definir</option></select></div>
-          </div>
-          <label for="visit-exams">Exames solicitados (um por linha)</label>
-          <textarea id="visit-exams" name="exam_names" rows="4" placeholder="${defaultExams.join(', ')}"></textarea>
+          <details class="form-module" open>
+            <summary>Cadastrar Paciente</summary>
+            <div class="module-content">
+              <div class="field"><label for="patient-name">NOME DO PACIENTE *</label><input id="patient-name" name="full_name" required maxlength="160" autocomplete="name" placeholder="Nome completo"></div>
+              <div class="field"><label for="patient-cpf">CPF (somente números)</label><input id="patient-cpf" name="cpf" inputmode="numeric" pattern="[0-9]{11}" maxlength="11" placeholder="11 dígitos"></div>
+              <div class="field"><label for="patient-birth">DATA DE NASCIMENTO</label><input id="patient-birth" name="birth_date" type="date"></div>
+              <div class="field"><label for="patient-company">EMPRESA</label><input id="patient-company" name="company_name" maxlength="160" placeholder="Nome da empresa"></div>
+            </div>
+          </details>
+          <details class="form-module">
+            <summary>Tipo de Exame / Atendimento</summary>
+            <div class="module-content">
+              <div class="field"><label for="visit-type">TIPO DE EXAME / ATENDIMENTO *</label><select id="visit-type" name="attendance_type" required><option value="Pontual">Pontual</option><option value="Consulta Ocupacional">Consulta Ocupacional</option><option value="Agendado">Agendado</option></select></div>
+              <div class="field"><label for="visit-professional">PROFISSIONAL</label><select id="visit-professional" name="professional_id"><option value="">A definir</option></select></div>
+              <div class="field"><label for="visit-room">SALA INICIAL</label><select id="visit-room" name="room_id"><option value="">A definir</option></select><p class="sub" style="margin:7px 0 0">A sala inicial pode ser definida agora ou durante o atendimento.</p></div>
+            </div>
+          </details>
+          <details class="form-module">
+            <summary>Marcar Exames Específicos</summary>
+            <div class="module-content">
+              <div class="field"><label>EXAMES SOLICITADOS (MARQUE TODOS)</label><div class="service-options">
+                ${defaultExams.map((exam) => `<label class="service-option"><input type="checkbox" name="exam_names" value="${escapeHtml(exam)}"> ${escapeHtml(exam)}</label>`).join('')}
+              </div></div>
+              <div class="field"><label for="other-exams">OUTROS EXAMES (OPCIONAL)</label><textarea id="other-exams" name="other_exam_names" rows="3" placeholder="Digite outros exames, um por linha"></textarea></div>
+            </div>
+          </details>
           <button class="submit" id="checkin-submit" type="submit">Cadastrar e colocar na fila</button>
           <p id="checkin-message" class="message" role="status"></p>
         </form>
@@ -414,7 +429,7 @@ async function renderOperationalModules(profile, userId) {
         operationalMessage('#checkin-message', 'O CPF deve conter exatamente 11 números.', true);
         return;
       }
-      const examNames = String(values.exam_names || '').split(/[\n,;]/).map((name) => name.trim()).filter(Boolean);
+      const examNames = [...new Set([...form.querySelectorAll('input[name="exam_names"]:checked')].map((input) => input.value.trim()).concat(String(values.other_exam_names || '').split(/[\\n,;]/).map((name) => name.trim()).filter(Boolean)))];
       button.disabled = true;
       button.textContent = 'Salvando cadastro…';
       operationalMessage('#checkin-message', '');
