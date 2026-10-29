@@ -34,6 +34,8 @@ O histórico remoto contém migrações antigas cujos SQLs iniciais não estão 
 - `20261029150000_operational_foundation.sql`: cria a base operacional, restrições, índices, políticas RLS, grants por coluna e gatilhos para atualização de timestamps e conclusão de exames.
 - `20261029195000_visit_timestamp_integrity.sql`: reforça os campos de auditoria e faz o banco controlar os horários de início/conclusão do atendimento.
 - `20261029201000_public_waiting_room.sql`: cria uma view pública somente de leitura para o painel de chamadas, sem CPF, nascimento, empresa ou exames.
+- `20261029202000_visit_called_status.sql`: separa o estado de chamada do início do atendimento e alimenta o painel público com o estado `chamado`.
+- `20261029203000_reception_workflow_fields.sql`: adiciona convênio, função, prioridade e flags de ASO; um gatilho impede profissionais de alterar prioridade ou status do ASO.
 
 ## Segurança e integridade
 
