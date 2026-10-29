@@ -65,7 +65,7 @@ assert.match(operationalMigration, /create policy visit_exams_update_professiona
 assert.match(frontend, /master: '\/master', recepcao: '\/recepcao', profissional: '\/profissional', sala: '\/sala'/);
 assert.match(frontend, /if \(!isMaster\) \{ renderOperationalModules\(profile, userId\); return; \}/);
 assert.match(frontend, /async function renderPublicWaitingRoom\(\)/);
-assert.match(frontend, /window\.location\.pathname === '\/sala'\) return renderPublicWaitingRoom\(\)/);
+assert.match(frontend, /window\.location\.pathname\.replace\(/);\nassert.match(frontend, /return renderPublicWaitingRoom\(\)/);
 assert.match(frontend, /public_waiting_room_calls/);
 assert.doesNotMatch(frontend, /<option value="sala">Sala de espera<\/option>/);
 
