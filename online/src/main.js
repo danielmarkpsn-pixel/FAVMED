@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import './style.css';
+import logoFavmed from '../../logo-favmed.png';
 
 const root = document.querySelector('#app');
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim();
@@ -28,7 +29,7 @@ function escapeHtml(value = '') {
 function renderSetup() {
   root.innerHTML = `
     <main class="shell"><section class="login-card">
-      <div class="brand-mark" aria-hidden="true">F</div>
+      <img class="brand-logo" src="${logoFavmed}" alt="Logo Clínica Favmed" />
       <p class="eyebrow">CLÍNICA FAVMED</p><h1>FAVMED Online</h1>
       <p class="muted">Acesso centralizado e seguro à clínica.</p>
       <div class="notice" role="alert">O ambiente ainda não foi configurado. Defina
@@ -40,7 +41,7 @@ function renderSetup() {
 function renderLogin(message = '', isError = false) {
   root.innerHTML = `
     <main class="shell"><section class="login-card" aria-labelledby="page-title">
-      <div class="brand-mark" aria-hidden="true">F</div>
+      <img class="brand-logo" src="${logoFavmed}" alt="Logo Clínica Favmed" />
       <p class="eyebrow">CLÍNICA FAVMED · MEDICINA OCUPACIONAL</p>
       <h1 id="page-title">Bem-vindo ao FAVMED</h1>
       <p class="muted">Entre com a conta fornecida pelo administrador da clínica.</p>
@@ -138,7 +139,7 @@ function renderPasswordUpdate(isRecovery = false) {
   const expiredMessage = isRecovery
     ? 'O link de recuperação expirou ou já foi utilizado. Solicite outro link e tente novamente.'
     : 'O convite expirou ou já foi utilizado. Solicite um novo convite ao administrador.';
-  root.innerHTML = `<main class="shell"><section class="login-card"><div class="brand-mark" aria-hidden="true">F</div><p class="eyebrow">CLÍNICA FAVMED</p><h1>${heading}</h1><p class="muted">${description}</p><form id="update-password-form"><label for="new-password">Nova senha</label><input id="new-password" name="password" type="password" minlength="8" autocomplete="new-password" required><label for="confirm-new-password">Confirmar nova senha</label><input id="confirm-new-password" name="confirm_password" type="password" minlength="8" autocomplete="new-password" required><button class="submit" id="update-password-submit" type="submit">${submitLabel}</button><p id="update-password-message" class="message" role="status"></p></form></section><footer>FAVMED Online · Acesso restrito à Clínica Favmed</footer></main>`;
+  root.innerHTML = `<main class="shell"><section class="login-card"><img class="brand-logo" src="${logoFavmed}" alt="Logo Clínica Favmed" /><p class="eyebrow">CLÍNICA FAVMED</p><h1>${heading}</h1><p class="muted">${description}</p><form id="update-password-form"><label for="new-password">Nova senha</label><input id="new-password" name="password" type="password" minlength="8" autocomplete="new-password" required><label for="confirm-new-password">Confirmar nova senha</label><input id="confirm-new-password" name="confirm_password" type="password" minlength="8" autocomplete="new-password" required><button class="submit" id="update-password-submit" type="submit">${submitLabel}</button><p id="update-password-message" class="message" role="status"></p></form></section><footer>FAVMED Online · Acesso restrito à Clínica Favmed</footer></main>`;
   const form = document.querySelector('#update-password-form');
   const button = document.querySelector('#update-password-submit');
   const status = document.querySelector('#update-password-message');
@@ -491,10 +492,15 @@ function renderHome(profile, userId) {
   root.innerHTML = `
     <main class="shell dashboard-shell">
       <section class="login-card home-card">
-        <div class="brand-mark" aria-hidden="true">F</div>
-        <p class="eyebrow">CLÍNICA FAVMED</p>
-        <h1>Olá, ${escapeHtml(profile.display_name || label)}</h1>
-        <p class="muted">Sessão autenticada · Perfil: ${escapeHtml(label)}</p>
+        <header class="app-header">
+          <div class="brand">
+            <img class="brand-logo" src="${logoFavmed}" alt="Logo Clínica Favmed" />
+            <div class="brand-copy">
+              <h1>Clínica Favmed - Medicina Ocupacional</h1>
+              <p>Olá, ${escapeHtml(profile.display_name || label)} · Sessão autenticada · Perfil: ${escapeHtml(label)}</p>
+            </div>
+          </div>
+        </header>
         ${isMaster ? `
           <section class="admin-panel" aria-labelledby="admin-title">
             <h2 id="admin-title">Administração de usuários</h2>
