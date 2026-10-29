@@ -166,3 +166,20 @@ textarea:focus { outline: 3px solid #087f8c20; border-color: var(--teal); }
   .brand-copy h1 { font-size: 18px; }
   .module-card { min-width: 0; }
 }
+
+
+/* Formulário de recepção no padrão modular do FAVMED local */
+.form-module { border: 1px solid var(--line); border-radius: 12px; background: #fff; margin: 10px 0; overflow: hidden; }
+.form-module > summary { cursor: pointer; list-style: none; padding: 14px 16px; font-weight: 800; color: var(--teal); background: #f0f8f8; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.form-module > summary::-webkit-details-marker { display: none; }
+.form-module > summary::after { content: "＋"; font-size: 20px; }
+.form-module[open] > summary::after { content: "−"; }
+.module-content { padding: 4px 12px 12px; }
+.module-content .field { margin: 13px 0; }
+.module-content .field label { display: block; margin: 0 0 7px; color: #536a74; font-size: 12px; font-weight: 700; }
+.module-content input[type="checkbox"] { width: auto; min-height: auto; accent-color: var(--teal); }
+.service-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: #fbfdfe; align-items: center; }
+.service-option { display: flex; align-items: center; gap: 7px; font-size: 12px; color: #405760; min-width: 0; overflow-wrap: anywhere; }
+.service-option input { flex: 0 0 auto; }
+.operational-form .submit { margin-top: 16px; }
+@media (max-width: 480px) { .service-options { grid-template-columns: 1fr; } }
