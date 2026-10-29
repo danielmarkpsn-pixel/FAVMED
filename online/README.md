@@ -1,65 +1,44 @@
-# FAVMED Online — protótipo de autenticação
+# FAVMED Online
 
-Este diretório contém a aplicação online, separada do FAVMED Local. O servidor PowerShell e as páginas locais existentes não são substituídos. O produto online é exclusivo da Clínica Favmed.
-
-## Requisitos
-
-- Node.js LTS e npm.
-- Projeto Supabase de desenvolvimento autorizado.
-- Variáveis locais configuradas com URL do projeto e chave publicável.
+Aplicação online da Clínica Favmed, separada do FAVMED Local. O servidor PowerShell e as páginas locais existentes não são substituídos.
 
 ## Executar localmente
 
 1. Copie `.env.example` para `.env.local`.
-2. Preencha `VITE_SUPABASE_URL` e `VITE_SUPABASE_PUBLISHABLE_KEY` com a URL do projeto e a chave publicável.
+2. Preencha `VITE_SUPABASE_URL` e `VITE_SUPABASE_PUBLISHABLE_KEY` com os valores públicos do projeto.
 3. Dentro desta pasta (`online`), execute `npm install` e `npm run dev`.
-4. Para verificar o build, execute `npm run check` e `npm run build`.
+4. Valide com `npm run check` e `npm run build`.
 
 Nunca coloque chaves secret/service_role no frontend, em variáveis `VITE_*` ou no Git. Variáveis `VITE_*` são incorporadas ao código entregue ao navegador e só podem conter valores públicos.
 
-## Estado verificado
+## Estado atual verificado
 
-- Login por e-mail e senha com Supabase Auth e fluxo de convite com definição de senha inicial implementado no frontend.
-- Cadastro público não faz parte do fluxo da aplicação.
+- Login por e-mail e senha com Supabase Auth, recuperação de senha, convites e definição de senha inicial.
+- Cadastro público não faz parte do fluxo; a criação de contas é restrita ao Master.
 - A aplicação exige um registro `profiles` ativo com um dos perfis `master`, `recepcao`, `profissional` ou `sala`.
-- No projeto de desenvolvimento `qzjkoyqmjueosevzhxqa`, `public.profiles` existe, tem RLS habilitada e forçada, e a política de SELECT permite que o usuário autenticado leia somente seu próprio perfil.
-- A Edge Function `master-users` está ativa na versão 4. A versão 4 restringe o CORS à origem configurada e retorna erros específicos para limites de convite e e-mails existentes. Sem o segredo `FAVMED_ALLOWED_ORIGIN`, o padrão é `http://localhost:5173`; isso é adequado apenas para desenvolvimento local e deve ser configurado com a origem exata antes de usar outra origem ou publicar. Ela valida manualmente o token Bearer com Supabase Auth e exige perfil Master ativo antes de operações administrativas.
-- A configuração SMTP personalizada foi usada para enviar um convite de teste; isso não comprova, por si só, todos os fluxos de autorização nem a prontidão de produção.
-- O Security Advisor reporta proteção contra senhas comprometidas desativada.
+- A Edge Function `master-users` valida manualmente o token Bearer, exige perfil Master ativo e oferece `create_user`, `list_users` e `set_active` para contas que não são Master.
+- A Edge Function não usa CORS curinga. O segredo `FAVMED_ALLOWED_ORIGIN` deve conter a origem exata da aplicação; o padrão local só serve para desenvolvimento.
+- A implantação de produção da Vercel foi criada a partir da `main`, commit `0488912da4964f7fa82ebc42d3129117d1a687ab`, e está em estado READY.
+- A migração operacional `operational_foundation` foi aplicada ao projeto Supabase `qzjkoyqmjueosevzhxqa` em 2026-10-29. As tabelas `patients`, `professionals`, `rooms`, `patient_visits` e `visit_exams` existem com RLS habilitada e forçada.
+- Um teste transacional com dados sintéticos confirmou que a recepção pode inserir e ler um paciente durante a transação; a transação foi revertida e nenhum registro de teste foi mantido.
+- Um teste transacional com o perfil desativado confirmou que `private.current_active_role()` não retorna uma função ativa e que a consulta não revela pacientes. A transação foi revertida.
+- Os perfis existentes no momento da verificação são Master e recepção. Ainda é necessário testar com contas separadas de profissional e sala, além de concluir os fluxos completos de cadastro, fila, atendimento e exames antes de usar dados reais.
 
-## Histórico de migrações
+## Migrações
 
-O histórico do banco contém três migrações (`favmed_profiles_rls`, `secure_rls_auto_enable_function` e `restore_service_role_profiles_privileges`), mas a pasta versionada `supabase/migrations` não contém atualmente os SQLs das duas primeiras. Não reaplicar nem reconstruir migrações antigas por suposição. Consulte [SCHEMA-RECONCILIATION.md](supabase/SCHEMA-RECONCILIATION.md) antes de alterar o schema.
+O histórico remoto contém migrações antigas cujos SQLs iniciais não estão todos versionados no repositório. Não apagar nem reconstruir essas migrações por suposição. Consulte [SCHEMA-RECONCILIATION.md](supabase/SCHEMA-RECONCILIATION.md) antes de reconciliar instalações novas ou alterar o histórico.
 
-A migração versionada `20261028160000_restore_service_role_profiles_privileges.sql` restaura privilégios de `service_role` em `public.profiles`; ela não cria tabelas operacionais.
+- `20261028160000_restore_service_role_profiles_privileges.sql`: restaura privilégios de `service_role` em `public.profiles`.
+- `20261029150000_operational_foundation.sql`: cria a base operacional, restrições, índices, políticas RLS, grants por coluna e gatilhos para atualização de timestamps e conclusão de exames.
 
-## Função administrativa
+## Segurança e integridade
 
-A função `supabase/functions/master-users/index.ts` suporta `create_user` (convite por e-mail), `list_users` e `set_active` para contas não-Master. Não permite criar Masters pela interface e impede o Master de bloquear a própria conta.
+- O schema operacional usa RLS habilitada e forçada nas cinco tabelas de negócio.
+- Pacientes ficam visíveis para Master/recepção e para o profissional associado ao atendimento; usuários de sala não recebem acesso geral aos dados pessoais.
+- Usuários de sala veem os atendimentos e exames associados à sala vinculada ao próprio perfil.
+- O banco define `completed_by` e `completed_at` quando um exame passa para `realizado`; o cliente não escolhe esses valores.
+- A interface cria paciente, atendimento e exames por chamadas REST separadas, não por uma transação atômica. Se uma etapa falhar, pode ser necessário reconciliar o cadastro incompleto. Esse fluxo deve ser aprimorado antes do uso operacional amplo.
+- Não usar dados reais de pacientes até concluir testes de ponta a ponta para todos os perfis e revisar a segurança e privacidade.
+- Nunca apagar contas Auth automaticamente para resolver erros de convite; confirme o vínculo com `profiles` antes de qualquer reparo.
 
-A função está configurada com `verify_jwt = false` para compatibilidade com as chaves modernas. Isso desativa a validação automática do gateway: por isso, o código precisa continuar validando manualmente o token e autorizando apenas um perfil Master ativo. As variáveis modernas são `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEYS` e `SUPABASE_SECRET_KEYS`; as chaves secretas permanecem apenas no ambiente da função. Há fallback para variáveis legadas do Supabase.
-
-O CORS não usa mais curinga (`*`). Configure o segredo `FAVMED_ALLOWED_ORIGIN` na Edge Function com a origem exata da aplicação, incluindo protocolo e porta quando aplicável (por exemplo, `http://localhost:5173` no desenvolvimento). Antes da produção, substitua pelo domínio oficial; não publique com a origem de desenvolvimento. O código responde com erro claro para limites de envio de convite (HTTP 429) e e-mails já cadastrados (HTTP 409). Não fique repetindo convites após um 429: aguarde a liberação do limite e verifique SMTP/limites do Auth.
-
-Consulte [MASTER-BOOTSTRAP.md](supabase/MASTER-BOOTSTRAP.md) e [SCHEMA-RECONCILIATION.md](supabase/SCHEMA-RECONCILIATION.md).
-
-## Pendências obrigatórias antes de produção
-
-- Reconciliar e tornar reproduzível o histórico de migrações.
-- Criar as tabelas operacionais de forma incremental, com constraints, índices e políticas RLS desde o início.
-- Testar login, logout, convite, ativação/desativação e acesso negado para perfis não-Master.
-- Verificar que usuário inativo não consegue autenticar; não depender apenas da interface ou presumir que tokens emitidos anteriormente são revogados imediatamente.
-- Habilitar proteção contra senhas comprometidas, se disponível no projeto, e confirmar no Security Advisor.
-- Definir `FAVMED_ALLOWED_ORIGIN` para o domínio oficial na Edge Function e confirmar o preflight CORS antes da publicação.
-- Verificar convites com erro 429/409 e revisar manualmente contas Auth sem perfil antes de tentar novamente; não apagar contas automaticamente sem identificar o vínculo e o histórico.
-- Revisar segurança e privacidade antes de usar dados reais de pacientes.
-- Configurar a Vercel somente depois de validar a integração.
-
-O sistema continua sendo um protótipo de autenticação. O schema verificado contém apenas `public.profiles`; pacientes, fila, atendimentos, profissionais e salas ainda não estão integrados ao banco. Não liberar módulos operacionais nem usar dados reais de pacientes até concluir os testes de segurança.
-
-
-## Implementação operacional em revisão (branch de funcionalidade)
-
-A branch `feature/favmed-online-operational-modules` contém uma primeira interface para cadastro de pacientes e entrada na fila, atribuição de profissional/sala, visualização por perfil e atualização de status de atendimentos/exames. O perfil Master também pode cadastrar salas e vincular contas de sala. A migração aditiva `20261029150000_operational_foundation.sql` cria as tabelas operacionais e políticas/grants restritivos.
-
-Esta implementação ainda não está liberada na `main` nem implantada no Supabase remoto. A compilação do preview não substitui os testes de integração RLS com contas separadas (Master, recepção, profissional, sala e usuário inativo). Não usar dados reais nem mesclar/aplicar a migração antes dessas validações. O cadastro de paciente e atendimento usa múltiplas chamadas REST, não uma transação atômica; se uma etapa falhar, a interface informa em qual etapa ocorreu a falha e pode ser necessária reconciliação manual.
+Consulte também [MASTER-BOOTSTRAP.md](supabase/MASTER-BOOTSTRAP.md) e [SCHEMA-RECONCILIATION.md](supabase/SCHEMA-RECONCILIATION.md).
