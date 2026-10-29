@@ -50,7 +50,7 @@ create table if not exists public.professionals (
 create table if not exists public.rooms (
   id uuid primary key default gen_random_uuid(),
   name text not null unique check (char_length(trim(name)) between 1 and 80),
-  room_type text not null default 'atendimento'
+  room_type text not null default 'outro'
     check (room_type in ('recepcao', 'consulta', 'exame', 'espera', 'outro')),
   assigned_profile_id uuid unique references public.profiles(id) on delete set null,
   active boolean not null default true,
