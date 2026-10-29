@@ -74,4 +74,5 @@ assert.match(publicWaitingMigration, /create or replace view public\.public_wait
 assert.match(publicWaitingMigration, /grant select on public\.public_waiting_room_calls to anon/);
 assert.match(publicWaitingMigration, /revoke all on public\.public_waiting_room_calls from public, authenticated/);
 assert.match(publicWaitingMigration, /v\.status = 'em_atendimento'/);
-const publicWaitingColumns = publicWaitingMigration.split('as\\nselect')[1]?.split('\\nfrom public.patient_visits')[0] || '';\nassert.doesNotMatch(publicWaitingColumns, /cpf|birth_date|company_name|exam_name/i);
+const publicWaitingColumns = publicWaitingMigration.split('as\nselect')[1]?.split('\nfrom public.patient_visits')[0] || '';
+assert.doesNotMatch(publicWaitingColumns, /cpf|birth_date|company_name|exam_name/i);
