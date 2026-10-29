@@ -335,7 +335,7 @@ grant update (name, room_type, assigned_profile_id, active, display_order, updat
 grant select, insert, delete on public.patient_visits to authenticated;
 grant update (visit_date, attendance_type, status, company_name, professional_id, room_id, started_at, completed_at, updated_at) on public.patient_visits to authenticated;
 grant select, insert, delete on public.visit_exams to authenticated;
-grant update (status, result_summary, completed_by, completed_at, display_order, updated_at) on public.visit_exams to authenticated;
+grant update (status, result_summary, completed_at, display_order, updated_at) on public.visit_exams to authenticated;
 
 
 -- Keep timestamps current even when a client does not send updated_at.
@@ -367,3 +367,28 @@ for each row execute function private.set_updated_at();
 drop trigger if exists visit_exams_set_updated_at on public.visit_exams;
 create trigger visit_exams_set_updated_at before update on public.visit_exams
 for each row execute function private.set_updated_at();
+
+
+-- The database, not the browser, decides who completed an exam.
+create or replace function private.set_visit_exam_completion()
+returns trigger
+language plpgsql
+security invoker
+set search_path = pg_catalog
+as $$
+begin
+  if new.status = 'realizado' and old.status is distinct from 'realizado' then
+    new.completed_by := (select auth.uid());
+    new.completed_at := now();
+  elsif new.status <> 'realizado' then
+    new.completed_by := null;
+    new.completed_at := null;
+  end if;
+  new.updated_at := now();
+  return new;
+end;
+$$;
+revoke all on function private.set_visit_exam_completion() from public, anon, authenticated;
+drop trigger if exists visit_exams_set_completion on public.visit_exams;
+create trigger visit_exams_set_completion before update on public.visit_exams
+for each row execute function private.set_visit_exam_completion();
