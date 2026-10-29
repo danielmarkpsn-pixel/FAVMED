@@ -291,7 +291,12 @@ async function renderOperationalModules(profile, userId) {
         <div class="table-wrap"><table class="users-table"><thead><tr><th>Sala</th><th>Tipo</th><th>Status</th></tr></thead><tbody id="room-list-rows"><tr><td colspan="3">Carregando salas…</td></tr></tbody></table></div>
       </section>` : ''}
     <section class="module-card">
-      <div class="users-heading"><h3>${profile.role === 'sala' ? 'Exames desta sala' : profile.role === 'profissional' ? 'Minha fila de atendimentos' : 'Fila e atendimentos'}</h3><span class="muted" id="operational-count"></span></div>
+      <div class="users-heading"><h3>${profile.role === 'sala' ? 'Exames desta sala' : profile.role === 'profissional' ? 'Painel do profissional' : 'Pacientes na fila'}</h3><span class="muted" id="operational-count"></span></div>
+      <div class="operational-tools">
+        <input id="operational-search" type="search" placeholder="Buscar paciente ou exame..." aria-label="Buscar paciente ou exame" />
+        ${profile.role === 'profissional' ? '<select id="professional-room-filter" aria-label="Filtrar por sala"><option value="">Todas as salas</option></select>' : ''}
+        <button class="secondary" id="export-operational-csv" type="button">Exportar CSV</button>
+      </div>
       <div class="table-wrap"><table class="users-table operational-table">
         <thead><tr><th>Paciente / Atendimento</th><th>Exames</th><th>Status</th><th>Ação</th></tr></thead>
         <tbody id="operational-rows"><tr><td colspan="4">Carregando dados…</td></tr></tbody>
@@ -301,6 +306,8 @@ async function renderOperationalModules(profile, userId) {
 
   const professionalSelect = document.querySelector('#visit-professional');
   const roomSelect = document.querySelector('#visit-room');
+  const professionalRoomFilter = document.querySelector('#professional-room-filter');
+  let lastPatientsById = new Map();
     if (profile.role === 'recepcao') {
     const { data: savedRooms, error: savedRoomsError } = await supabase.from('rooms')
       .select('id, name, room_type, active').order('display_order').order('name');
@@ -338,6 +345,9 @@ async function renderOperationalModules(profile, userId) {
   }
   if (roomSelect && !roomResult.error) {
     roomSelect.innerHTML = '<option value="">A definir</option>' + (roomResult.data || []).map((r) => `<option value="${escapeHtml(r.id)}">${escapeHtml(r.name)}</option>`).join('');
+  }
+  if (professionalRoomFilter && !roomResult.error) {
+    professionalRoomFilter.innerHTML = '<option value="">Todas as salas</option>' + (roomResult.data || []).map((r) => `<option value="${escapeHtml(r.id)}">${escapeHtml(r.name)}</option>`).join('');
   }
 
   async function loadOperationalRows() {
@@ -384,7 +394,7 @@ async function renderOperationalModules(profile, userId) {
     const visitIds = (visits || []).map((visit) => visit.id);
     const patientIds = [...new Set((visits || []).map((visit) => visit.patient_id))];
     const [patientsResult, examsResult] = await Promise.all([
-      patientIds.length ? supabase.from('patients').select('id, full_name, company_name, insurance, job_title').in('id', patientIds) : Promise.resolve({ data: [], error: null }),
+      patientIds.length ? supabase.from('patients').select('id, full_name, cpf, birth_date, company_name, insurance, job_title').in('id', patientIds) : Promise.resolve({ data: [], error: null }),
       visitIds.length ? supabase.from('visit_exams').select('id, visit_id, exam_name, status, room_id, display_order').in('visit_id', visitIds).order('display_order') : Promise.resolve({ data: [], error: null }),
     ]);
     if (patientsResult.error || examsResult.error) {
@@ -398,6 +408,16 @@ async function renderOperationalModules(profile, userId) {
     const rows = document.querySelector('#operational-rows');
     const count = document.querySelector('#operational-count');
     if (!rows) return;
+    lastPatientsById = new Map(patients.map((patient) => [patient.id, patient]));
+    const term = document.querySelector('#operational-search')?.value.trim().toLocaleLowerCase('pt-BR') || '';
+    const selectedRoomId = document.querySelector('#professional-room-filter')?.value || '';
+    visits = visits.filter((visit) => {
+      const patient = lastPatientsById.get(visit.patient_id);
+      const visitExams = exams.filter((exam) => exam.visit_id === visit.id);
+      const matchesRoom = !selectedRoomId || visit.room_id === selectedRoomId || visitExams.some((exam) => exam.room_id === selectedRoomId);
+      const searchable = [patient?.full_name, patient?.cpf, patient?.company_name, ...visitExams.map((exam) => exam.exam_name)].filter(Boolean).join(' ').toLocaleLowerCase('pt-BR');
+      return matchesRoom && (!term || searchable.includes(term));
+    }).sort((a, b) => Number(Boolean(b.priority)) - Number(Boolean(a.priority)) || new Date(a.checked_in_at || 0) - new Date(b.checked_in_at || 0));
     count.textContent = `${visits.length} atendimento(s)`;
     if (!visits.length) {
       rows.innerHTML = '<tr><td colspan="4">Nenhum atendimento encontrado.</td></tr>';
@@ -408,18 +428,19 @@ async function renderOperationalModules(profile, userId) {
       const patient = patientMap.get(visit.patient_id);
       const visitExams = exams.filter((exam) => exam.visit_id === visit.id);
       const status = roomMode ? (visitExams.some((exam) => exam.status === 'em_atendimento') ? 'em_atendimento' : (visitExams.every((exam) => exam.status === 'realizado') ? 'atendido' : 'aguardando')) : visit.status;
+      const sheetButton = !roomMode && patient ? `<button type="button" class="secondary patient-sheet-button" data-patient-id="${escapeHtml(patient.id)}">Visualizar Ficha</button>` : '';
       const action = roomMode
         ? visitExams.map((exam) => `<button type="button" class="secondary exam-status-button" data-exam-id="${escapeHtml(exam.id)}" data-next-status="${exam.status === 'pendente' ? 'em_atendimento' : 'realizado'}">${escapeHtml(exam.exam_name)}: ${exam.status === 'pendente' ? 'Iniciar' : 'Marcar realizado'}</button>`).join(' ')
         : (profile.role === 'profissional'
-          ? (visit.status === 'aguardando'
+          ? `${sheetButton} ${(visit.status === 'aguardando'
             ? `<button type="button" class="secondary visit-status-button" data-visit-id="${escapeHtml(visit.id)}" data-next-status="chamado">🔊 Chamar paciente</button>`
             : visit.status === 'chamado'
               ? `<button type="button" class="secondary visit-status-button" data-visit-id="${escapeHtml(visit.id)}" data-next-status="em_atendimento">Iniciar atendimento</button>`
               : visit.status === 'em_atendimento'
                 ? `<button type="button" class="secondary visit-status-button" data-visit-id="${escapeHtml(visit.id)}" data-next-status="atendido">Concluir atendimento</button>`
-                : '')
+                : '')}`
           : profile.role === 'recepcao'
-            ? `<button type="button" class="secondary priority-toggle-button" data-visit-id="${escapeHtml(visit.id)}" data-next-priority="${!visit.priority}">${visit.priority ? 'Retirar prioridade' : 'Marcar prioridade'}</button> <button type="button" class="secondary aso-toggle-button ${visit.aso_completed ? 'aso-completed' : visit.aso_pending ? 'aso-pending' : ''}" data-visit-id="${escapeHtml(visit.id)}" data-next-aso="${visit.aso_completed ? 'reset' : visit.aso_pending ? 'complete' : 'pending'}">${visit.aso_completed ? 'ASO REALIZADO ✓' : visit.aso_pending ? 'ASO PENDENTE · Marcar realizado' : 'Marcar ASO pendente'}</button>`
+            ? `${sheetButton} <button type="button" class="secondary priority-toggle-button" data-visit-id="${escapeHtml(visit.id)}" data-next-priority="${!visit.priority}">${visit.priority ? 'Retirar prioridade' : 'Marcar prioridade'}</button> <button type="button" class="secondary aso-toggle-button ${visit.aso_completed ? 'aso-completed' : visit.aso_pending ? 'aso-pending' : ''}" data-visit-id="${escapeHtml(visit.id)}" data-next-aso="${visit.aso_completed ? 'reset' : visit.aso_pending ? 'complete' : 'pending'}">${visit.aso_completed ? 'ASO REALIZADO ✓' : visit.aso_pending ? 'ASO PENDENTE · Marcar realizado' : 'Marcar ASO pendente'}</button>`
             : '');
       const examLabels = visitExams.length ? visitExams.map((exam) => `<span class="exam-pill">${escapeHtml(exam.exam_name)} · ${escapeHtml(exam.status)}</span>`).join(' ') : '<span class="muted">Sem exames vinculados</span>';
       const patientLabel = roomMode ? `Atendimento #${escapeHtml(visit.id.slice(0, 8))}` : escapeHtml(patient?.full_name || 'Paciente não visível');
@@ -490,11 +511,31 @@ async function renderOperationalModules(profile, userId) {
   }
 
   document.querySelector('#refresh-operational').addEventListener('click', loadOperationalRows);
+  document.querySelector('#operational-search').addEventListener('input', () => loadOperationalRows());
+  professionalRoomFilter?.addEventListener('change', () => loadOperationalRows());
+  document.querySelector('#export-operational-csv').addEventListener('click', () => {
+    const tableRows = [...document.querySelectorAll('#operational-rows tr')].map((tr) => [...tr.cells].map((cell) => cell.innerText.replace(/\\s+/g, ' ').trim()));
+    const csv = tableRows.map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(',')).join('\\r\\n');
+    const url = URL.createObjectURL(new Blob(['\\ufeff', csv], { type: 'text/csv;charset=utf-8;' }));
+    const link = document.createElement('a'); link.href = url; link.download = `favmed-atendimentos-${new Date().toISOString().slice(0, 10)}.csv`; link.click(); URL.revokeObjectURL(url);
+  });
   document.querySelector('#operational-rows').addEventListener('click', async (event) => {
     const examButton = event.target.closest('.exam-status-button');
     const visitButton = event.target.closest('.visit-status-button');
     const priorityButton = event.target.closest('.priority-toggle-button');
     const asoButton = event.target.closest('.aso-toggle-button');
+    const sheetButton = event.target.closest('.patient-sheet-button');
+    if (sheetButton) {
+      const patient = lastPatientsById.get(sheetButton.dataset.patientId);
+      if (!patient) return;
+      const dialog = document.createElement('dialog');
+      dialog.className = 'patient-sheet-dialog';
+      dialog.innerHTML = `<form method="dialog"><button class="secondary dialog-close" aria-label="Fechar">Fechar</button></form><h2>Ficha do paciente</h2><dl><dt>Nome</dt><dd>${escapeHtml(patient.full_name || '')}</dd><dt>CPF</dt><dd>${escapeHtml(patient.cpf || '—')}</dd><dt>Data de nascimento</dt><dd>${escapeHtml(patient.birth_date || '—')}</dd><dt>Empresa</dt><dd>${escapeHtml(patient.company_name || '—')}</dd><dt>Convênio</dt><dd>${escapeHtml(patient.insurance || '—')}</dd><dt>Função / cargo</dt><dd>${escapeHtml(patient.job_title || '—')}</dd></dl>`;
+      document.body.append(dialog);
+      if (typeof dialog.showModal === 'function') dialog.showModal(); else dialog.setAttribute('open', '');
+      dialog.addEventListener('close', () => dialog.remove(), { once: true });
+      return;
+    }
     try {
       if (examButton) {
         examButton.disabled = true;
