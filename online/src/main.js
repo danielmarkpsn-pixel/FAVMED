@@ -437,7 +437,7 @@ async function renderOperationalModules(profile, userId) {
           ? `${sheetButton} ${(visit.status === 'aguardando'
             ? `<button type="button" class="secondary visit-status-button" data-visit-id="${escapeHtml(visit.id)}" data-next-status="chamado">🔊 Chamar paciente</button>`
             : visit.status === 'chamado'
-              ? `<button type="button" class="secondary visit-status-button" data-visit-id="${escapeHtml(visit.id)}" data-next-status="em_atendimento">Iniciar atendimento</button>`
+              ? `<button type="button" class="secondary visit-status-button" data-visit-id="${escapeHtml(visit.id)}" data-next-status="em_atendimento">Iniciar atendimento</button> <button type="button" class="secondary repeat-call-button" data-visit-id="${escapeHtml(visit.id)}">Repetir chamada</button> <button type="button" class="secondary cancel-call-button" data-visit-id="${escapeHtml(visit.id)}">Cancelar chamada</button>`
               : visit.status === 'em_atendimento'
                 ? `<button type="button" class="secondary visit-status-button" data-visit-id="${escapeHtml(visit.id)}" data-next-status="atendido">Concluir atendimento</button>`
                 : '')}`
@@ -527,6 +527,8 @@ async function renderOperationalModules(profile, userId) {
     const priorityButton = event.target.closest('.priority-toggle-button');
     const asoButton = event.target.closest('.aso-toggle-button');
     const sheetButton = event.target.closest('.patient-sheet-button');
+    const repeatCallButton = event.target.closest('.repeat-call-button');
+    const cancelCallButton = event.target.closest('.cancel-call-button');
     if (sheetButton) {
       const patient = lastPatientsById.get(sheetButton.dataset.patientId);
       if (!patient) return;
@@ -555,6 +557,18 @@ async function renderOperationalModules(profile, userId) {
         if (error) throw error;
         operationalMessage('#operational-message', nextStatus === 'chamado' ? 'Paciente chamado. O painel público será atualizado.' : 'Status do atendimento atualizado.');
         await loadOperationalRows();
+      } else if (repeatCallButton) {
+        repeatCallButton.disabled = true;
+        const { error } = await supabase.from('patient_visits').update({ updated_at: new Date().toISOString() }).eq('id', repeatCallButton.dataset.visitId).eq('status', 'chamado');
+        if (error) throw error;
+        operationalMessage('#operational-message', 'Chamada repetida no painel público.');
+        await loadOperationalRows();
+      } else if (cancelCallButton) {
+        cancelCallButton.disabled = true;
+        const { error } = await supabase.from('patient_visits').update({ status: 'aguardando' }).eq('id', cancelCallButton.dataset.visitId).eq('status', 'chamado');
+        if (error) throw error;
+        operationalMessage('#operational-message', 'Chamada cancelada.');
+        await loadOperationalRows();
       } else if (priorityButton) {
         priorityButton.disabled = true;
         const { error } = await supabase.from('patient_visits').update({ priority: priorityButton.dataset.nextPriority === 'true' }).eq('id', priorityButton.dataset.visitId);
@@ -575,6 +589,8 @@ async function renderOperationalModules(profile, userId) {
       if (visitButton) visitButton.disabled = false;
       if (priorityButton) priorityButton.disabled = false;
       if (asoButton) asoButton.disabled = false;
+      if (repeatCallButton) repeatCallButton.disabled = false;
+      if (cancelCallButton) cancelCallButton.disabled = false;
     }
   });
   await loadOperationalRows();
