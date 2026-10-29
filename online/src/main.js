@@ -466,8 +466,7 @@ function renderHome(profile, userId) {
               <thead><tr><th>Usuário</th><th>Perfil</th><th>Status</th><th>Ação</th></tr></thead>
               <tbody id="users-body"><tr><td colspan="4">Carregando contas…</td></tr></tbody>
             </table></div>
-          </section>` : `
-          <div class="notice">O acesso foi validado. Os módulos operacionais serão habilitados após a implantação e validação das tabelas e políticas de segurança do banco.</div>`}
+          </section>` : ``}
         <section id="operational-panel" class="operational-panel" aria-label="Módulos operacionais"></section>
         <button class="secondary" id="sign-out" type="button">Sair da conta</button>
       </section>
