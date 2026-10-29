@@ -248,6 +248,7 @@ async function renderOperationalModules(profile, userId) {
               <div class="field"><label for="patient-company">EMPRESA</label><input id="patient-company" name="company_name" maxlength="160" placeholder="Nome da empresa"></div>
               <div class="field"><label for="patient-insurance">CONVÊNIO / PARTICULAR</label><input id="patient-insurance" name="insurance" maxlength="100" placeholder="Convênio ou particular"></div>
               <div class="field"><label for="patient-job">FUNÇÃO / CARGO</label><input id="patient-job" name="job_title" maxlength="100" placeholder="Função do paciente"></div>
+              <div class="field"><label for="patient-pdf">DOCUMENTO DO PACIENTE (PDF — ATÉ 10 MB)</label><input id="patient-pdf" name="patient_pdf" type="file" accept="application/pdf,.pdf"><p class="sub">Documento privado; somente equipe autorizada poderá abrir.</p></div>
             </div>
           </details>
           <details class="form-module">
@@ -396,7 +397,7 @@ async function renderOperationalModules(profile, userId) {
     const visitIds = (visits || []).map((visit) => visit.id);
     const patientIds = [...new Set((visits || []).map((visit) => visit.patient_id))];
     const [patientsResult, examsResult] = await Promise.all([
-      patientIds.length ? supabase.from('patients').select('id, full_name, cpf, birth_date, company_name, insurance, job_title').in('id', patientIds) : Promise.resolve({ data: [], error: null }),
+      patientIds.length ? supabase.from('patients').select('id, full_name, cpf, birth_date, company_name, insurance, job_title, document_path').in('id', patientIds) : Promise.resolve({ data: [], error: null }),
       visitIds.length ? supabase.from('visit_exams').select('id, visit_id, exam_name, status, room_id, display_order').in('visit_id', visitIds).order('display_order') : Promise.resolve({ data: [], error: null }),
     ]);
     if (patientsResult.error || examsResult.error) {
@@ -461,6 +462,10 @@ async function renderOperationalModules(profile, userId) {
       const button = document.querySelector('#checkin-submit');
       const values = Object.fromEntries(new FormData(form).entries());
       const cpf = String(values.cpf || '').replace(/\D/g, '');
+      const documentFile = form.querySelector('#patient-pdf')?.files?.[0] || null;
+      if (documentFile && (documentFile.size > 10 * 1024 * 1024 || (documentFile.type && documentFile.type !== 'application/pdf') || !documentFile.name.toLowerCase().endsWith('.pdf'))) {
+        operationalMessage('#checkin-message', 'O documento deve ser um PDF de até 10 MB.', true); return;
+      }
       if (cpf && !/^\d{11}$/.test(cpf)) {
         operationalMessage('#checkin-message', 'O CPF deve conter exatamente 11 números.', true);
         return;
@@ -501,6 +506,13 @@ async function renderOperationalModules(profile, userId) {
           const { error: examError } = await supabase.from('visit_exams').insert(examRows);
           if (examError) throw new Error(`Atendimento criado, mas não foi possível salvar os exames: ${examError.message}`);
         }
+        if (documentFile) {
+          const documentPath = `${patient.id}/${crypto.randomUUID()}.pdf`;
+          const { error: uploadError } = await supabase.storage.from('patient-documents').upload(documentPath, documentFile, { contentType: 'application/pdf', upsert: false });
+          if (uploadError) throw new Error(`Atendimento criado, mas o PDF não foi anexado: ${uploadError.message}`);
+          const { error: documentUpdateError } = await supabase.from('patients').update({ document_path: documentPath }).eq('id', patient.id);
+          if (documentUpdateError) throw new Error(`PDF enviado, mas não foi possível vincular o documento à ficha: ${documentUpdateError.message}`);
+        }
         form.reset();
         operationalMessage('#checkin-message', 'Paciente cadastrado e atendimento enviado à fila.');
         await loadOperationalRows();
@@ -536,10 +548,25 @@ async function renderOperationalModules(profile, userId) {
       if (!patient) return;
       const dialog = document.createElement('dialog');
       dialog.className = 'patient-sheet-dialog';
-      dialog.innerHTML = `<form method="dialog"><button class="secondary dialog-close" aria-label="Fechar">Fechar</button></form><h2>Ficha do paciente</h2><dl><dt>Nome</dt><dd>${escapeHtml(patient.full_name || '')}</dd><dt>CPF</dt><dd>${escapeHtml(patient.cpf || '—')}</dd><dt>Data de nascimento</dt><dd>${escapeHtml(patient.birth_date || '—')}</dd><dt>Empresa</dt><dd>${escapeHtml(patient.company_name || '—')}</dd><dt>Convênio</dt><dd>${escapeHtml(patient.insurance || '—')}</dd><dt>Função / cargo</dt><dd>${escapeHtml(patient.job_title || '—')}</dd></dl>`;
+      dialog.innerHTML = `<form method="dialog"><button class="secondary dialog-close" aria-label="Fechar">Fechar</button></form><h2>Ficha do paciente</h2><dl><dt>Nome</dt><dd>${escapeHtml(patient.full_name || '')}</dd><dt>CPF</dt><dd>${escapeHtml(patient.cpf || '—')}</dd><dt>Data de nascimento</dt><dd>${escapeHtml(patient.birth_date || '—')}</dd><dt>Empresa</dt><dd>${escapeHtml(patient.company_name || '—')}</dd><dt>Convênio</dt><dd>${escapeHtml(patient.insurance || '—')}</dd><dt>Função / cargo</dt><dd>${escapeHtml(patient.job_title || '—')}</dd></dl>${patient.document_path ? '<button type="button" class="secondary" id="generate-patient-pdf-link">Gerar link seguro do PDF</button><a id="patient-pdf-link" class="secondary" hidden target="_blank" rel="noopener noreferrer">Abrir PDF (expira em 5 minutos)</a><p id="patient-pdf-message" class="message" role="status"></p>' : '<p class="muted">Nenhum PDF anexado.</p>'}`;
       document.body.append(dialog);
       if (typeof dialog.showModal === 'function') dialog.showModal(); else dialog.setAttribute('open', '');
       dialog.addEventListener('close', () => dialog.remove(), { once: true });
+      if (patient.document_path) {
+        dialog.querySelector('#generate-patient-pdf-link')?.addEventListener('click', async (clickEvent) => {
+          const button = clickEvent.currentTarget;
+          const message = dialog.querySelector('#patient-pdf-message');
+          button.disabled = true;
+          try {
+            const { data, error } = await supabase.storage.from('patient-documents').createSignedUrl(patient.document_path, 300);
+            if (error) throw error;
+            const link = dialog.querySelector('#patient-pdf-link');
+            link.href = data.signedUrl; link.hidden = false;
+            message.textContent = 'Link seguro criado. Ele expira em 5 minutos.';
+          } catch (error) { message.textContent = error.message || 'Não foi possível gerar o link do documento.'; message.className = 'message error'; }
+          finally { button.disabled = false; }
+        });
+      }
       return;
     }
     if (editPatientButton) {
@@ -551,7 +578,7 @@ async function renderOperationalModules(profile, userId) {
       const examMarkup = Object.entries(examCatalog).map(([roomName, exams]) => `<details class="exam-room-menu"><summary>${escapeHtml(roomName)} — exames disponíveis</summary><div class="service-options">${exams.map((exam) => `<label class="service-option"><input type="checkbox" name="edit_exam_names" data-room-name="${roomName}" value="${escapeHtml(exam)}" ${existingNames.has(exam) ? 'disabled' : ''}> ${escapeHtml(exam)} ${existingNames.has(exam) ? '<small>(já cadastrado)</small>' : ''}</label>`).join('')}</div></details>`).join('');
       const dialog = document.createElement('dialog');
       dialog.className = 'patient-sheet-dialog patient-edit-dialog';
-      dialog.innerHTML = `<form id="edit-patient-form"><div class="users-heading"><h2>Editar paciente / adicionar exames</h2><button type="button" class="secondary edit-dialog-close">Fechar</button></div><label>Nome completo *</label><input name="full_name" required maxlength="160" value="${escapeHtml(patient.full_name || '')}"><label>CPF</label><input name="cpf" inputmode="numeric" maxlength="11" value="${escapeHtml(patient.cpf || '')}"><label>Data de nascimento</label><input name="birth_date" type="date" value="${escapeHtml(patient.birth_date || '')}"><label>Empresa</label><input name="company_name" maxlength="160" value="${escapeHtml(patient.company_name || '')}"><label>Convênio / particular</label><input name="insurance" maxlength="100" value="${escapeHtml(patient.insurance || '')}"><label>Função / cargo</label><input name="job_title" maxlength="100" value="${escapeHtml(patient.job_title || '')}"><h3>Adicionar exames (os existentes serão preservados)</h3>${examMarkup}<label>Outros exames</label><textarea name="other_exam_names" rows="3" placeholder="Um exame por linha"></textarea><button class="submit" type="submit">Salvar alterações</button><p class="message" id="edit-patient-message" role="status"></p></form>`;
+      dialog.innerHTML = `<form id="edit-patient-form"><div class="users-heading"><h2>Editar paciente / adicionar exames</h2><button type="button" class="secondary edit-dialog-close">Fechar</button></div><label>Nome completo *</label><input name="full_name" required maxlength="160" value="${escapeHtml(patient.full_name || '')}"><label>CPF</label><input name="cpf" inputmode="numeric" maxlength="11" value="${escapeHtml(patient.cpf || '')}"><label>Data de nascimento</label><input name="birth_date" type="date" value="${escapeHtml(patient.birth_date || '')}"><label>Empresa</label><input name="company_name" maxlength="160" value="${escapeHtml(patient.company_name || '')}"><label>Convênio / particular</label><input name="insurance" maxlength="100" value="${escapeHtml(patient.insurance || '')}"><label>Função / cargo</label><input name="job_title" maxlength="100" value="${escapeHtml(patient.job_title || '')}"><label>Documento do paciente (PDF até 10 MB)</label><input name="patient_pdf" type="file" accept="application/pdf,.pdf"><h3>Adicionar exames (os existentes serão preservados)</h3>${examMarkup}<label>Outros exames</label><textarea name="other_exam_names" rows="3" placeholder="Um exame por linha"></textarea><button class="submit" type="submit">Salvar alterações</button><p class="message" id="edit-patient-message" role="status"></p></form>`;
       document.body.append(dialog);
       const closeEdit = () => { if (dialog.open && typeof dialog.close === 'function') dialog.close(); else dialog.remove(); };
       dialog.querySelector('.edit-dialog-close').addEventListener('click', closeEdit);
@@ -564,6 +591,8 @@ async function renderOperationalModules(profile, userId) {
         const status = dialog.querySelector('#edit-patient-message');
         const save = form.querySelector('button[type="submit"]');
         const cpf = String(values.cpf || '').replace(/\D/g, '');
+        const documentFile = form.querySelector('input[name="patient_pdf"]')?.files?.[0] || null;
+        if (documentFile && (documentFile.size > 10 * 1024 * 1024 || (documentFile.type && documentFile.type !== 'application/pdf') || !documentFile.name.toLowerCase().endsWith('.pdf'))) { status.textContent = 'O documento deve ser um PDF de até 10 MB.'; status.className = 'message error'; return; }
         if (cpf && !/^\d{11}$/.test(cpf)) { status.textContent = 'O CPF deve conter 11 números.'; status.className = 'message error'; return; }
         save.disabled = true;
         try {
@@ -573,6 +602,13 @@ async function renderOperationalModules(profile, userId) {
             insurance: String(values.insurance || '').trim() || null, job_title: String(values.job_title || '').trim() || null,
           }).eq('id', patient.id);
           if (patientUpdateError) throw patientUpdateError;
+          if (documentFile) {
+            const documentPath = `${patient.id}/${crypto.randomUUID()}.pdf`;
+            const { error: uploadError } = await supabase.storage.from('patient-documents').upload(documentPath, documentFile, { contentType: 'application/pdf', upsert: false });
+            if (uploadError) throw uploadError;
+            const { error: documentUpdateError } = await supabase.from('patients').update({ document_path: documentPath }).eq('id', patient.id);
+            if (documentUpdateError) throw documentUpdateError;
+          }
           const { error: visitUpdateError } = await supabase.from('patient_visits').update({ company_name: String(values.company_name || '').trim() || null }).eq('id', visitId);
           if (visitUpdateError) throw visitUpdateError;
           const selected = [...form.querySelectorAll('input[name="edit_exam_names"]:checked')].map((input) => ({ name: input.value.trim(), roomName: input.dataset.roomName || '' }));
