@@ -60,3 +60,18 @@ assert.match(integrityMigration, /patients_created_by_idx/);
 assert.match(integrityMigration, /patient_visits_created_by_idx/);
 assert.match(operationalMigration, /create policy patient_visits_update_professional/);
 assert.match(operationalMigration, /create policy visit_exams_update_professional/);
+
+// Each role gets its own page; Master must not contain operational setup.
+assert.match(frontend, /master: '\/master', recepcao: '\/recepcao', profissional: '\/profissional', sala: '\/sala'/);
+assert.match(frontend, /if \(!isMaster\) \{ renderOperationalModules\(profile, userId\); return; \}/);
+assert.match(frontend, /async function renderPublicWaitingRoom\(\)/);
+assert.match(frontend, /window\.location\.pathname === '\/sala'\) return renderPublicWaitingRoom\(\)/);
+assert.match(frontend, /public_waiting_room_calls/);
+assert.doesNotMatch(frontend, /<option value="sala">Sala de espera<\/option>/);
+
+const publicWaitingMigration = await readFile(new URL('../supabase/migrations/20261029201000_public_waiting_room.sql', import.meta.url), 'utf8');
+assert.match(publicWaitingMigration, /create or replace view public\.public_waiting_room_calls/);
+assert.match(publicWaitingMigration, /grant select on public\.public_waiting_room_calls to anon/);
+assert.match(publicWaitingMigration, /revoke all on public\.public_waiting_room_calls from public, authenticated/);
+assert.match(publicWaitingMigration, /v\.status = 'em_atendimento'/);
+assert.doesNotMatch(publicWaitingMigration, /cpf|birth_date|company_name|exam_name/i);
