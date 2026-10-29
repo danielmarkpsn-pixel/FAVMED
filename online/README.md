@@ -37,6 +37,7 @@ O histórico remoto contém migrações antigas cujos SQLs iniciais não estão 
 - `20261029202000_visit_called_status.sql`: separa o estado de chamada do início do atendimento e alimenta o painel público com o estado `chamado`.
 - `20261029203000_reception_workflow_fields.sql`: adiciona convênio, função, prioridade e flags de ASO; um gatilho impede profissionais de alterar prioridade ou status do ASO.
 - `20261029204000_patient_documents_storage.sql`: configura bucket privado para PDFs, com limite de 10 MB e políticas de leitura/gravação por perfil.
+- `20261029205000_visit_exam_called_status.sql`: habilita chamada por exame individual e publica somente a chamada ativa, com sala e nome abreviado.
 
 ## Segurança e integridade
 
