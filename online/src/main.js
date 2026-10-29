@@ -431,16 +431,24 @@ async function renderOperationalModules(profile, userId) {
     rows.innerHTML = visits.map((visit) => {
       const patient = patientMap.get(visit.patient_id);
       const visitExams = exams.filter((exam) => exam.visit_id === visit.id);
-      const status = roomMode ? (visitExams.some((exam) => exam.status === 'em_atendimento') ? 'em_atendimento' : (visitExams.every((exam) => exam.status === 'realizado') ? 'atendido' : 'aguardando')) : visit.status;
+      const status = (roomMode || profile.role === 'profissional') && visitExams.length
+        ? (visitExams.some((exam) => exam.status === 'em_atendimento') ? 'em_atendimento' : visitExams.some((exam) => exam.status === 'chamado') ? 'chamado' : visitExams.every((exam) => exam.status === 'realizado') ? 'atendido' : visit.status)
+        : visit.status;
       const sheetButton = !roomMode && patient ? `<button type="button" class="secondary patient-sheet-button" data-patient-id="${escapeHtml(patient.id)}">Visualizar Ficha</button>` : '';
       const editButton = profile.role === 'recepcao' && patient ? `<button type="button" class="secondary edit-patient-button" data-patient-id="${escapeHtml(patient.id)}" data-visit-id="${escapeHtml(visit.id)}">Editar / adicionar exames</button>` : '';
       const action = roomMode
         ? visitExams.map((exam) => `<button type="button" class="secondary exam-status-button" data-exam-id="${escapeHtml(exam.id)}" data-next-status="${exam.status === 'pendente' ? 'em_atendimento' : 'realizado'}">${escapeHtml(exam.exam_name)}: ${exam.status === 'pendente' ? 'Iniciar' : 'Marcar realizado'}</button>`).join(' ')
         : (profile.role === 'profissional'
-          ? `${sheetButton} ${(visit.status === 'aguardando'
+          ? `${sheetButton} ${visitExams.length ? visitExams.map((exam) => exam.status === 'pendente'
+            ? `<button type="button" class="secondary exam-status-button" data-exam-id="${escapeHtml(exam.id)}" data-next-status="chamado">🔊 Chamar ${escapeHtml(exam.exam_name)}</button>`
+            : exam.status === 'chamado'
+              ? `<button type="button" class="secondary exam-status-button" data-exam-id="${escapeHtml(exam.id)}" data-next-status="em_atendimento">Iniciar ${escapeHtml(exam.exam_name)}</button><button type="button" class="secondary repeat-exam-call-button" data-exam-id="${escapeHtml(exam.id)}">Repetir chamada</button><button type="button" class="secondary cancel-exam-call-button" data-exam-id="${escapeHtml(exam.id)}">Cancelar chamada</button>`
+              : exam.status === 'em_atendimento'
+                ? `<button type="button" class="secondary exam-status-button" data-exam-id="${escapeHtml(exam.id)}" data-next-status="realizado">Concluir ${escapeHtml(exam.exam_name)}</button>`
+                : `<span class="status-pill active">${escapeHtml(exam.exam_name)} · realizado</span>`).join(' ') : (visit.status === 'aguardando'
             ? `<button type="button" class="secondary visit-status-button" data-visit-id="${escapeHtml(visit.id)}" data-next-status="chamado">🔊 Chamar paciente</button>`
             : visit.status === 'chamado'
-              ? `<button type="button" class="secondary visit-status-button" data-visit-id="${escapeHtml(visit.id)}" data-next-status="em_atendimento">Iniciar atendimento</button> <button type="button" class="secondary repeat-call-button" data-visit-id="${escapeHtml(visit.id)}">Repetir chamada</button> <button type="button" class="secondary cancel-call-button" data-visit-id="${escapeHtml(visit.id)}">Cancelar chamada</button>`
+              ? `<button type="button" class="secondary visit-status-button" data-visit-id="${escapeHtml(visit.id)}" data-next-status="em_atendimento">Iniciar atendimento</button>`
               : visit.status === 'em_atendimento'
                 ? `<button type="button" class="secondary visit-status-button" data-visit-id="${escapeHtml(visit.id)}" data-next-status="atendido">Concluir atendimento</button>`
                 : '')}`
@@ -655,7 +663,23 @@ async function renderOperationalModules(profile, userId) {
         const payload = { status: nextStatus, updated_at: new Date().toISOString() };
         const { error } = await supabase.from('visit_exams').update(payload).eq('id', examButton.dataset.examId);
         if (error) throw error;
-        operationalMessage('#operational-message', 'Status do exame atualizado.');
+        if (profile.role === 'profissional') {
+          const { data: examRecord, error: examRecordError } = await supabase.from('visit_exams').select('visit_id').eq('id', examButton.dataset.examId).single();
+          if (examRecordError) throw examRecordError;
+          let visitStatus = nextStatus === 'chamado' ? 'chamado' : nextStatus === 'em_atendimento' ? 'em_atendimento' : '';
+          if (nextStatus === 'realizado') {
+            const { data: siblingExams, error: siblingError } = await supabase.from('visit_exams').select('status').eq('visit_id', examRecord.visit_id);
+            if (siblingError) throw siblingError;
+            visitStatus = siblingExams?.length && siblingExams.every((item) => item.status === 'realizado') ? 'atendido'
+              : siblingExams?.some((item) => item.status === 'em_atendimento') ? 'em_atendimento'
+              : siblingExams?.some((item) => item.status === 'chamado') ? 'chamado' : 'aguardando';
+          }
+          if (visitStatus) {
+            const { error: visitUpdateError } = await supabase.from('patient_visits').update({ status: visitStatus }).eq('id', examRecord.visit_id);
+            if (visitUpdateError) throw visitUpdateError;
+          }
+        }
+        operationalMessage('#operational-message', nextStatus === 'chamado' ? 'Exame chamado. O painel público será atualizado.' : 'Status do exame atualizado.');
         await loadOperationalRows();
       } else if (visitButton) {
         visitButton.disabled = true;
