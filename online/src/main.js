@@ -5,6 +5,9 @@ const root = document.querySelector('#app');
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim();
 const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim();
 const configured = Boolean(supabaseUrl && supabaseKey);
+// Supabase PKCE recovery links can arrive as ?code=... without type=recovery.
+// PASSWORD_RECOVERY is the reliable signal for that flow.
+let passwordRecoveryInProgress = false;
 const supabase = configured ? createClient(supabaseUrl, supabaseKey, {
   auth: { autoRefreshToken: true, persistSession: true, detectSessionInUrl: true },
 }) : null;
@@ -314,8 +317,8 @@ async function start() {
   const isRecovery = authType === 'recovery';
   const { data: { session }, error: sessionError } = await supabase.auth.getSession();
   if (sessionError) return renderLogin('Não foi possível validar o link. Solicite um novo link e tente novamente.', true);
-  if (isInvite || isRecovery) {
-    if (session?.user) return renderPasswordUpdate(isRecovery);
+  if (passwordRecoveryInProgress || isInvite || isRecovery) {
+    if (session?.user) return renderPasswordUpdate(passwordRecoveryInProgress || isRecovery);
     const message = isRecovery
       ? 'O link de recuperação expirou ou já foi utilizado. Solicite outro link para redefinir a senha.'
       : 'O convite expirou ou já foi utilizado. Solicite um novo convite ao administrador.';
@@ -333,7 +336,15 @@ async function start() {
 
 if (configured) {
   supabase.auth.onAuthStateChange((event) => {
-    if (event === 'SIGNED_OUT') renderLogin();
+    if (event === 'PASSWORD_RECOVERY') {
+      passwordRecoveryInProgress = true;
+      renderPasswordUpdate(true);
+      return;
+    }
+    if (event === 'SIGNED_OUT') {
+      passwordRecoveryInProgress = false;
+      renderLogin();
+    }
   });
 }
 start();
