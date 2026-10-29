@@ -318,11 +318,11 @@ with check (
 
 -- Reception/Master may read only active professional names for assignment.
 -- The role helper can return only the caller's own active role.
-create policy profiles_select_professional_directory on public.profiles
+create policy profiles_select_staff_directory on public.profiles
 for select to authenticated
 using (
   private.current_active_role() in ('master', 'recepcao')
-  and role = 'profissional'
+  and role in ('profissional', 'sala')
   and active is true
 );
 
