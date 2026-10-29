@@ -304,8 +304,12 @@ function renderHome(profile, userId) {
 
 async function start() {
   if (!configured) return renderSetup();
-  const authParams = new URLSearchParams(window.location.hash.slice(1));
-  const authType = authParams.get('type');
+  // Supabase may return the flow type in the URL hash (implicit flow)
+  // or the query string (depending on the email template / redirect setup).
+  // Capture it before deciding whether an authenticated session may reach the panel.
+  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+  const queryParams = new URLSearchParams(window.location.search);
+  const authType = hashParams.get('type') || queryParams.get('type');
   const isInvite = authType === 'invite';
   const isRecovery = authType === 'recovery';
   const { data: { session }, error: sessionError } = await supabase.auth.getSession();
