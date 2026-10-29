@@ -103,7 +103,7 @@ assert.match(frontend, /backup-operational-json/);
 
 const examCallMigration = await readFile(new URL('../supabase/migrations/20261029205000_visit_exam_called_status.sql', import.meta.url), 'utf8');
 assert.match(examCallMigration, /'chamado'/);
-assert.match(examCallMigration, /join public\.visit_exams e/);
+assert.match(examCallMigration, /from public\.visit_exams e/);
 assert.match(frontend, /repeat-exam-call-button/);
 assert.match(frontend, /cancel-exam-call-button/);
 assert.match(frontend, /data-next-status="chamado"/);
