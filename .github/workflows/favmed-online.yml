@@ -3,6 +3,7 @@ name: FAVMED Online CI
 on:
   push:
     branches:
+      - main
       - feature/favmed-online-master-login
     paths:
       - "online/**"
