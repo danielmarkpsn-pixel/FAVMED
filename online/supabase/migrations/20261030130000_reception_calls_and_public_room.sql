@@ -7,11 +7,11 @@ with calls as (
   select
     case
       when position(' ' in trim(p.full_name)) > 0 then
-        regexp_replace(trim(p.full_name), '\\s+.*$', '')
+        regexp_replace(trim(p.full_name), '\s+.*$', '')
         || ' '
-        || left(regexp_replace(trim(p.full_name), '^.*\\s+', ''), 1)
+        || left(regexp_replace(trim(p.full_name), '^.*\s+', ''), 1)
         || '.'
-      else regexp_replace(trim(p.full_name), '\\s+.*$', '')
+      else regexp_replace(trim(p.full_name), '\s+.*$', '')
     end as display_name,
     coalesce(r.name, 'Recepção') as room_name,
     e.updated_at as called_at
@@ -27,11 +27,11 @@ with calls as (
   select
     case
       when position(' ' in trim(p.full_name)) > 0 then
-        regexp_replace(trim(p.full_name), '\\s+.*$', '')
+        regexp_replace(trim(p.full_name), '\s+.*$', '')
         || ' '
-        || left(regexp_replace(trim(p.full_name), '^.*\\s+', ''), 1)
+        || left(regexp_replace(trim(p.full_name), '^.*\s+', ''), 1)
         || '.'
-      else regexp_replace(trim(p.full_name), '\\s+.*$', '')
+      else regexp_replace(trim(p.full_name), '\s+.*$', '')
     end as display_name,
     coalesce(r.name, 'Recepção') as room_name,
     v.updated_at as called_at
