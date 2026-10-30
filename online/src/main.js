@@ -319,6 +319,17 @@ async function renderOperationalModules(profile, userId) {
       <p id="operational-message" class="message" role="status"></p>
     </section>`;
 
+  const editPatientSelect = document.querySelector('#edit-patient-select');
+  const editPatientOpen = document.querySelector('#edit-patient-open');
+  editPatientSelect?.addEventListener('change', () => {
+    const visit = lastVisitsById.get(editPatientSelect.value);
+    const patient = visit && lastPatientsById.get(visit.patient_id);
+    if (editPatientOpen) {
+      editPatientOpen.disabled = !patient;
+      editPatientOpen.dataset.patientId = patient?.id || '';
+      editPatientOpen.dataset.visitId = visit?.id || '';
+    }
+  });
   const professionalSelect = document.querySelector('#visit-professional');
   const roomSelect = document.querySelector('#visit-room');
   const professionalRoomFilter = document.querySelector('#professional-room-filter');
@@ -497,7 +508,7 @@ async function renderOperationalModules(profile, userId) {
         ? (visitExams.some((exam) => exam.status === 'em_atendimento') ? 'em_atendimento' : visitExams.some((exam) => exam.status === 'chamado') ? 'chamado' : visitExams.every((exam) => exam.status === 'realizado') ? 'atendido' : visit.status)
         : visit.status;
       const sheetButton = !roomMode && patient ? `<button type="button" class="secondary patient-sheet-button" data-patient-id="${escapeHtml(patient.id)}" data-visit-id="${escapeHtml(visit.id)}">Visualizar Ficha</button>` : '';
-      const editButton = profile.role === 'recepcao' && patient ? `<button type="button" class="secondary edit-patient-button" data-patient-id="${escapeHtml(patient.id)}" data-visit-id="${escapeHtml(visit.id)}">Editar / adicionar exames</button>` : '';
+      const editButton = '';
       const action = roomMode
         ? visitExams.map((exam) => `<button type="button" class="secondary exam-status-button" data-exam-id="${escapeHtml(exam.id)}" data-next-status="${exam.status === 'pendente' ? 'em_atendimento' : 'realizado'}">${escapeHtml(exam.exam_name)}: ${exam.status === 'pendente' ? 'Iniciar' : 'Marcar realizado'}</button>`).join(' ')
         : (profile.role === 'profissional'
@@ -515,13 +526,13 @@ async function renderOperationalModules(profile, userId) {
                 ? `<button type="button" class="secondary visit-status-button" data-visit-id="${escapeHtml(visit.id)}" data-next-status="atendido">Concluir atendimento</button>`
                 : '')}`
           : profile.role === 'recepcao'
-            ? `${sheetButton} ${editButton} ${['Recepção 1','Recepção 2','Recepção 3'].map((label) => { const station = (roomResult.data || []).find((room) => room.name.toLowerCase() === label.toLowerCase()); return station ? `<button type="button" class="secondary reception-call-button" data-visit-id="${escapeHtml(visit.id)}" data-room-id="${escapeHtml(station.id)}">Chamar na ${label}</button>` : ''; }).join(' ')} <button type="button" class="secondary priority-toggle-button" data-visit-id="${escapeHtml(visit.id)}" data-next-priority="${!visit.priority}">${visit.priority ? 'Retirar prioridade' : 'Marcar prioridade'}</button> <button type="button" class="secondary aso-toggle-button ${visit.aso_completed ? 'aso-completed' : visit.aso_pending ? 'aso-pending' : ''}" data-visit-id="${escapeHtml(visit.id)}" data-next-aso="${visit.aso_completed ? 'reset' : visit.aso_pending ? 'complete' : 'pending'}">${visit.aso_completed ? 'ASO REALIZADO ✓' : visit.aso_pending ? 'ASO PENDENTE · Marcar realizado' : 'Marcar ASO pendente'}</button>`
+            ? `${sheetButton} ${['Recepção 1','Recepção 2','Recepção 3'].map((label) => { const station = (roomResult.data || []).find((room) => room.name.toLowerCase() === label.toLowerCase()); return station ? `<button type="button" class="secondary reception-call-button" data-visit-id="${escapeHtml(visit.id)}" data-room-id="${escapeHtml(station.id)}">Chamar na ${label}</button>` : ''; }).join(' ')} <button type="button" class="secondary priority-toggle-button" data-visit-id="${escapeHtml(visit.id)}" data-next-priority="${!visit.priority}">${visit.priority ? 'Retirar prioridade' : 'Marcar prioridade'}</button> <button type="button" class="secondary aso-toggle-button ${visit.aso_completed ? 'aso-completed' : visit.aso_pending ? 'aso-pending' : ''}" data-visit-id="${escapeHtml(visit.id)}" data-next-aso="${visit.aso_completed ? 'reset' : visit.aso_pending ? 'complete' : 'pending'}">${visit.aso_completed ? 'ASO REALIZADO ✓' : visit.aso_pending ? 'ASO PENDENTE · Marcar realizado' : 'Marcar ASO pendente'}</button>`
             : '');
       const roomNames = [...new Set(visitExams.map((exam) => (roomResult.data || []).find((room) => room.id === exam.room_id)?.name).filter(Boolean).concat((visit.initial_room_ids || []).map((id) => (roomResult.data || []).find((room) => room.id === id)?.name).filter(Boolean)))];
       const roomLabels = roomNames.length ? roomNames.map((name) => `<span class="exam-pill">${escapeHtml(name)}</span>`).join(' ') : '<span class="muted">Sala não definida</span>';
       const patientLabel = roomMode ? `Atendimento #${escapeHtml(visit.id.slice(0, 8))}` : escapeHtml(patient?.full_name || 'Paciente não visível');
       const flags = profile.role === 'recepcao' ? `${visit.priority ? '<span class="priority-flag">PRIORIDADE</span>' : ''}${visit.aso_completed ? '<span class="aso-flag aso-completed">ASO REALIZADO</span>' : visit.aso_pending ? '<span class="aso-flag aso-pending">ASO PENDENTE</span>' : ''}` : '';
-      const receptionAction = profile.role === 'recepcao' ? `<details class="row-action-menu"><summary class="secondary">Selecione</summary><div class="row-action-options">${sheetButton} ${editButton} ${['Recepção 1','Recepção 2','Recepção 3'].map((label) => { const station = (roomResult.data || []).find((room) => room.name.toLowerCase() === label.toLowerCase()); return station ? `<button type="button" class="secondary reception-call-button" data-visit-id="${escapeHtml(visit.id)}" data-room-id="${escapeHtml(station.id)}">Chamar na ${label}</button>` : ''; }).join(' ')} <button type="button" class="secondary priority-toggle-button" data-visit-id="${escapeHtml(visit.id)}" data-next-priority="${!visit.priority}">${visit.priority ? 'Retirar prioridade' : 'Marcar prioridade'}</button> <button type="button" class="secondary aso-toggle-button ${visit.aso_completed ? 'aso-completed' : visit.aso_pending ? 'aso-pending' : ''}" data-visit-id="${escapeHtml(visit.id)}" data-next-aso="${visit.aso_completed ? 'reset' : visit.aso_pending ? 'complete' : 'pending'}">${visit.aso_completed ? 'ASO REALIZADO ✓' : visit.aso_pending ? 'ASO PENDENTE · Marcar realizado' : 'Marcar ASO pendente'}</button></div></details>` : action;
+      const receptionAction = profile.role === 'recepcao' ? `<details class="row-action-menu"><summary class="secondary">Selecione</summary><div class="row-action-options">${sheetButton} ${['Recepção 1','Recepção 2','Recepção 3'].map((label) => { const station = (roomResult.data || []).find((room) => room.name.toLowerCase() === label.toLowerCase()); return station ? `<button type="button" class="secondary reception-call-button" data-visit-id="${escapeHtml(visit.id)}" data-room-id="${escapeHtml(station.id)}">Chamar na ${label}</button>` : ''; }).join(' ')} <button type="button" class="secondary priority-toggle-button" data-visit-id="${escapeHtml(visit.id)}" data-next-priority="${!visit.priority}">${visit.priority ? 'Retirar prioridade' : 'Marcar prioridade'}</button> <button type="button" class="secondary aso-toggle-button ${visit.aso_completed ? 'aso-completed' : visit.aso_pending ? 'aso-pending' : ''}" data-visit-id="${escapeHtml(visit.id)}" data-next-aso="${visit.aso_completed ? 'reset' : visit.aso_pending ? 'complete' : 'pending'}">${visit.aso_completed ? 'ASO REALIZADO ✓' : visit.aso_pending ? 'ASO PENDENTE · Marcar realizado' : 'Marcar ASO pendente'}</button><button type="button" class="secondary delete-patient-button" data-visit-id="${escapeHtml(visit.id)}" data-patient-name="${escapeHtml(patient?.full_name || 'Paciente')}">Excluir paciente</button></div></details>` : action;
       return `<tr><td><strong>${patientLabel}</strong><div class="patient-row-flags">${flags}</div></td><td>${roomLabels}</td><td><span class="status-pill ${status === 'atendido' ? 'active' : status === 'cancelado' ? 'inactive' : ''}">${escapeHtml(operationalStatuses[status] || status)}</span></td><td>${receptionAction || '<span class="muted">—</span>'}</td></tr>`;
     }).join('');
   }
@@ -629,7 +640,24 @@ async function renderOperationalModules(profile, userId) {
     } catch (error) { operationalMessage('#operational-message', error.message || 'Não foi possível gerar o backup.', true); }
     finally { button.disabled = false; button.textContent = 'Backup JSON'; }
   });
-  document.querySelector('#operational-rows').addEventListener('click', async (event) => {
+  panel.addEventListener('click', async (event) => {
+    const menuSummary = event.target.closest('.row-action-menu > summary');
+    if (menuSummary) {
+      const currentMenu = menuSummary.parentElement;
+      requestAnimationFrame(() => {
+        if (!currentMenu.open) return;
+        document.querySelectorAll('.row-action-menu[open]').forEach((menu) => { if (menu !== currentMenu) menu.open = false; });
+        const rect = menuSummary.getBoundingClientRect();
+        const popup = currentMenu.querySelector('.row-action-options');
+        const width = Math.min(300, window.innerWidth - 24);
+        const height = Math.min(320, window.innerHeight - 24);
+        const left = Math.max(12, Math.min(rect.left, window.innerWidth - width - 12));
+        const below = rect.bottom + 6;
+        const top = below + height <= window.innerHeight - 12 ? below : Math.max(12, rect.top - height - 6);
+        popup.style.left = left + 'px';
+        popup.style.top = top + 'px';
+      });
+    }
     const examButton = event.target.closest('.exam-status-button');
     const visitButton = event.target.closest('.visit-status-button');
     const receptionCallButton = event.target.closest('.reception-call-button');
@@ -637,10 +665,26 @@ async function renderOperationalModules(profile, userId) {
     const asoButton = event.target.closest('.aso-toggle-button');
     const sheetButton = event.target.closest('.patient-sheet-button');
     const editPatientButton = event.target.closest('.edit-patient-button');
+    const deletePatientButton = event.target.closest('.delete-patient-button');
     const repeatCallButton = event.target.closest('.repeat-call-button');
     const cancelCallButton = event.target.closest('.cancel-call-button');
     const repeatExamCallButton = event.target.closest('.repeat-exam-call-button');
     const cancelExamCallButton = event.target.closest('.cancel-exam-call-button');
+    if (deletePatientButton) {
+      const visitId = deletePatientButton.dataset.visitId;
+      const patientName = deletePatientButton.dataset.patientName || 'este paciente';
+      if (!window.confirm('Remover ' + patientName + ' da fila de hoje? O cadastro e o histórico clínico serão preservados.')) return;
+      deletePatientButton.disabled = true;
+      const { error } = await supabase.from('patient_visits').update({ status: 'cancelado', updated_at: new Date().toISOString() }).eq('id', visitId);
+      if (error) {
+        operationalMessage('#operational-message', error.message || 'Não foi possível remover o paciente da fila.', true);
+        deletePatientButton.disabled = false;
+        return;
+      }
+      operationalMessage('#operational-message', 'Paciente removido da fila. Cadastro e histórico foram preservados.');
+      await loadOperationalRows();
+      return;
+    }
     if (sheetButton) {
       const patient = lastPatientsById.get(sheetButton.dataset.patientId);
       if (!patient) return;
