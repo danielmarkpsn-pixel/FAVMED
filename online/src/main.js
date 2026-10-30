@@ -998,7 +998,7 @@ function renderHome(profile, userId) {
   loadUsers();
 }
 
-async function renderPublicWaitingRoom() {
+async async function renderPublicWaitingRoom() {
   root.innerHTML = '<main class="waiting-screen favmed-room-screen">' +
     '<header class="waiting-brand"><img class="brand-logo" src="' + escapeHtml(logoFavmed) + '" alt="Clínica Favmed"/><div><h1>Clínica Favmed</h1><p>PAINEL DE CHAMADAS</p></div><button class="secondary audio-enable" id="enable-call-audio" type="button">Ativar som</button><span class="public-live"><i></i> AO VIVO</span></header>' +
     '<section class="waiting-content"><p class="eyebrow">ATENÇÃO</p><h2>Chamadas da clínica</h2><div id="public-calls" class="room-call-grid" aria-live="polite"><div class="no-calls"><strong>Aguardando próxima chamada</strong>Por favor, aguarde.</div></div><p id="room-audio-status" class="waiting-note">Ative o som uma vez para liberar o áudio de chamadas neste navegador.</p></section>' +
