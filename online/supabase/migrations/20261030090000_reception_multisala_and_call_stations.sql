@@ -1,0 +1,3 @@
+alter table public.patient_visits add column if not exists initial_room_ids uuid[] not null default '{}';
+grant update (initial_room_ids) on public.patient_visits to authenticated;
+insert into public.rooms (name, room_type, active, display_order) values ('Recepção 1','recepcao',true,1),('Recepção 2','recepcao',true,2),('Recepção 3','recepcao',true,3) on conflict (name) do update set room_type=excluded.room_type, active=true, display_order=excluded.display_order, updated_at=now();
