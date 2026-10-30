@@ -999,42 +999,74 @@ function renderHome(profile, userId) {
 }
 
 async function renderPublicWaitingRoom() {
-  root.innerHTML = `
-    <main class="waiting-screen">
-      <header class="waiting-brand"><img class="brand-logo" src="${logoFavmed}" alt="Clínica Favmed"/><div><h1>Clínica Favmed</h1><p>PAINEL DE CHAMADAS</p></div><button class="secondary audio-enable" id="enable-call-audio" type="button">Ativar voz</button><span class="public-live"><i></i> AO VIVO</span></header>
-      <section class="waiting-content"><p class="eyebrow">ATENÇÃO</p><h2>Paciente chamado</h2><div id="public-calls" class="public-calls"><p class="muted">Carregando chamadas…</p></div><p class="waiting-note">Aguarde a chamada da recepção ou do profissional.</p></section>
-    </main>`;
+  root.innerHTML = '<main class="waiting-screen favmed-room-screen">' +
+    '<header class="waiting-brand"><img class="brand-logo" src="' + escapeHtml(logoFavmed) + '" alt="Clínica Favmed"/><div><h1>Clínica Favmed</h1><p>PAINEL DE CHAMADAS</p></div><button class="secondary audio-enable" id="enable-call-audio" type="button">Ativar som</button><span class="public-live"><i></i> AO VIVO</span></header>' +
+    '<section class="waiting-content"><p class="eyebrow">ATENÇÃO</p><h2>Chamadas da clínica</h2><div id="public-calls" class="room-call-grid" aria-live="polite"><div class="no-calls"><strong>Aguardando próxima chamada</strong>Por favor, aguarde.</div></div><p id="room-audio-status" class="waiting-note">Ative o som uma vez para liberar o áudio de chamadas neste navegador.</p></section>' +
+    '<audio id="room-call-signal" src="' + escapeHtml(callSignalUrl) + '" preload="auto" playsinline></audio></main>';
   const calls = document.querySelector('#public-calls');
   const audioButton = document.querySelector('#enable-call-audio');
+  const audio = document.querySelector('#room-call-signal');
+  const audioStatus = document.querySelector('#room-audio-status');
   let audioEnabled = false;
-  let lastSpokenCall = '';
-  audioButton.addEventListener('click', async () => {
-    audioEnabled = true;
-    audioButton.textContent = 'Voz ativada';
-    audioButton.disabled = true;
-    await refreshCalls();
-  });
+  let firstSnapshot = true;
+  const seenCallKeys = new Set();
+
   async function refreshCalls() {
-    const { data, error } = await supabase.from('public_waiting_room_calls').select('display_name, room_name, called_at').order('called_at', { ascending: false }).limit(5);
-    if (error) { calls.innerHTML = '<p class="muted">Painel temporariamente indisponível. Solicite ajuda à recepção.</p>'; return; }
-    calls.innerHTML = data?.length ? data.map((call, index) => `<article class="call-card ${index === 0 ? 'current-call' : ''}"><div><span class="call-label">${index === 0 ? 'CHAMADA ATUAL' : 'CHAMADA RECENTE'}</span><h3>${escapeHtml(call.display_name)}</h3></div><div class="call-room"><span>DIRIJA-SE À</span><strong>${escapeHtml(call.room_name || 'Recepção')}</strong></div></article>`).join('') : '<div class="no-calls"><h3>Nenhuma chamada no momento</h3><p>Por favor, aguarde.</p></div>';
-    const current = data?.[0];
-    const callKey = current ? `${current.called_at}|${current.display_name}|${current.room_name}` : '';
-    if (audioEnabled && current && callKey !== lastSpokenCall && 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window) {
-      lastSpokenCall = callKey;
-      const utterance = new SpeechSynthesisUtterance(`Atenção. ${current.display_name}. Favor dirigir-se à ${current.room_name || 'recepção'}.`);
-      utterance.lang = 'pt-BR';
-      const voices = window.speechSynthesis.getVoices();
-      const portugueseVoice = voices.find((voice) => voice.lang?.toLowerCase().startsWith('pt-br')) || voices.find((voice) => voice.lang?.toLowerCase().startsWith('pt'));
-      if (portugueseVoice) utterance.voice = portugueseVoice;
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(utterance);
+    const { data, error } = await supabase.from('public_waiting_room_calls')
+      .select('display_name, room_name, called_at, call_status')
+      .order('called_at', { ascending: false }).limit(12);
+    if (error) {
+      calls.innerHTML = '<p class="room-error">Painel temporariamente indisponível. Solicite ajuda à recepção.</p>';
+      return;
+    }
+    const activeCalls = data || [];
+    calls.innerHTML = activeCalls.length ? activeCalls.map((call) => {
+      const attending = call.call_status === 'em_atendimento';
+      return '<article class="room-call-card ' + (attending ? 'attending' : 'blinking') + '">' +
+        '<div class="call-label">' + (attending ? 'EM ATENDIMENTO' : 'PACIENTE CHAMADO') + '</div>' +
+        '<div class="call-name">' + escapeHtml(call.display_name) + '</div>' +
+        '<div class="call-room">➜ ' + escapeHtml(call.room_name || 'Recepção') + '</div></article>';
+    }).join('') : '<div class="no-calls"><strong>Aguardando próxima chamada</strong>Por favor, aguarde.</div>';
+
+    for (const call of activeCalls) {
+      const key = String(call.called_at) + '|' + call.display_name + '|' + call.room_name;
+      if (!seenCallKeys.has(key)) {
+        if (audioEnabled && !firstSnapshot && call.call_status === 'chamado') {
+          audio.pause();
+          audio.currentTime = 0;
+          audio.volume = 0.82;
+          audio.play().then(() => { audioStatus.textContent = 'Som de chamada reproduzido. Aguardando próxima chamada.'; })
+            .catch(() => { audioStatus.textContent = 'O navegador bloqueou o som. Clique em “Ativar som” e tente novamente.'; });
+        }
+        seenCallKeys.add(key);
+      }
+    }
+    firstSnapshot = false;
+  }
+
+  async function unlockCallAudio() {
+    if (audioEnabled) return;
+    audio.muted = true;
+    try {
+      await audio.play();
+      audio.pause();
+      audio.currentTime = 0;
+      audio.muted = false;
+      audioEnabled = true;
+      audioButton.textContent = 'Som ativado';
+      audioStatus.textContent = 'Áudio habilitado. Aguardando chamadas da recepção e dos profissionais.';
+      await refreshCalls();
+    } catch {
+      audio.muted = false;
+      audioStatus.textContent = 'Não foi possível ativar o som. Verifique o volume do dispositivo e tente novamente.';
     }
   }
-  await refreshCalls();
-  window.setInterval(refreshCalls, 5000);
+  audioButton.addEventListener('click', unlockCallAudio);
+  document.addEventListener('pointerdown', unlockCallAudio, { once: true });
+  document.addEventListener('keydown', unlockCallAudio, { once: true });
+  refreshCalls();
+  window.setInterval(refreshCalls, 1500);
 }
-
 async function start() {
   if (!configured) return renderSetup();
   if (window.location.pathname.replace(/\/+$/, '') === '/sala') return renderPublicWaitingRoom();
