@@ -243,11 +243,11 @@ async function renderOperationalModules(profile, userId) {
             <summary>Cadastrar Paciente</summary>
             <div class="module-content">
               <div class="field"><label for="patient-name">NOME DO PACIENTE *</label><input id="patient-name" name="full_name" required maxlength="160" autocomplete="name" placeholder="Nome completo"></div>
-              <div class="field"><label for="patient-cpf">CPF (somente números)</label><input id="patient-cpf" name="cpf" inputmode="numeric" pattern="[0-9]{11}" maxlength="11" placeholder="11 dígitos"></div>
-              <div class="field"><label for="patient-birth">DATA DE NASCIMENTO</label><input id="patient-birth" name="birth_date" type="date"></div>
+              <div class="field"><label for="patient-cpf">CPF (somente números)</label><input id="patient-cpf" name="cpf" inputmode="numeric" pattern="[0-9]{11}" maxlength="11" required placeholder="11 dígitos"></div>
+              <div class="field"><label for="patient-birth">DATA DE NASCIMENTO</label><input id="patient-birth" name="birth_date" type="date" required></div>
               <div class="field"><label for="patient-company">EMPRESA</label><input id="patient-company" name="company_name" maxlength="160" placeholder="Nome da empresa"></div>
-              <div class="field"><label for="patient-insurance">CONVÊNIO / PARTICULAR</label><input id="patient-insurance" name="insurance" maxlength="100" placeholder="Convênio ou particular"></div>
-              <div class="field"><label for="patient-job">FUNÇÃO / CARGO</label><input id="patient-job" name="job_title" maxlength="100" placeholder="Função do paciente"></div>
+              <div class="field"><label for="patient-insurance">CONVÊNIO / PARTICULAR</label><input id="patient-insurance" name="insurance" maxlength="100" required placeholder="Convênio ou particular"></div>
+              <div class="field"><label for="patient-job">FUNÇÃO / CARGO</label><input id="patient-job" name="job_title" maxlength="100" required placeholder="Função do paciente"></div>
               <div class="field"><label for="patient-pdf">DOCUMENTO DO PACIENTE (PDF — ATÉ 10 MB)</label><input id="patient-pdf" name="patient_pdf" type="file" accept="application/pdf,.pdf"><p class="sub">Documento privado; somente equipe autorizada poderá abrir.</p></div>
             </div>
           </details>
@@ -518,6 +518,13 @@ async function renderOperationalModules(profile, userId) {
       }
       const selectedExamInputs = [...form.querySelectorAll('input[name="exam_names"]:checked')];
       const examNames = [...new Map(selectedExamInputs.map((input) => [input.value.trim(), { name: input.value.trim(), roomName: input.dataset.roomName || '' }]).concat(String(values.other_exam_names || '').split(/[\n,;]/).map((name) => name.trim()).filter(Boolean).map((name) => [name, { name, roomName: '' }]))).values()];
+      const roomByIdForCheck = new Map((roomResult.data || []).map((room) => [room.id, room]));
+      const missingRoomExam = selectedRoomIds.map((roomId) => roomByIdForCheck.get(roomId)).find((room) =>
+        room && !examNames.some((exam) => exam.roomName === room.name));
+      if (missingRoomExam) {
+        operationalMessage('#checkin-message', `Selecione pelo menos um exame para ${missingRoomExam.name}.`, true);
+        return;
+      }
       button.disabled = true;
       button.textContent = 'Salvando cadastro…';
       operationalMessage('#checkin-message', '');
