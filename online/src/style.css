@@ -248,3 +248,18 @@ textarea:focus { outline: 3px solid #087f8c20; border-color: var(--teal); }
 .operational-heading-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .operational-heading-actions a { display: inline-flex; align-items: center; justify-content: center; padding: 10px 14px; border: 1px solid var(--line); border-radius: 10px; color: var(--teal); background: #fff; font-size: 13px; font-weight: 750; text-decoration: none; }
 .operational-heading-actions a:hover { background: #f0f8f8; }
+
+
+/* Compact reception queue actions and patient-first layout */
+.operational-table th:first-child { min-width: 190px; }
+.operational-table th:nth-child(2) { min-width: 130px; }
+.operational-table th:last-child { min-width: 112px; width: 132px; }
+.operational-table td:last-child { min-width: 112px; width: 132px; }
+.reception-action-menu { position: relative; width: 112px; }
+.reception-action-menu > summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: center; min-height: 36px; padding: 8px 12px; border: 1px solid #cbdadd; border-radius: 9px; color: #24505b; background: #fff; font-size: 12px; font-weight: 800; white-space: nowrap; }
+.reception-action-menu > summary::-webkit-details-marker { display: none; }
+.reception-action-menu > summary::after { content: "▾"; margin-left: 8px; }
+.reception-action-menu[open] > summary { border-color: var(--teal); background: #f0f8f8; }
+.reception-action-options { position: absolute; z-index: 20; right: 0; top: calc(100% + 5px); display: grid; gap: 6px; width: min(240px, 75vw); padding: 9px; border: 1px solid var(--line); border-radius: 11px; background: #fff; box-shadow: 0 12px 32px #173c4a24; }
+.reception-action-options .secondary { width: 100%; text-align: left; white-space: normal; }
+.reception-action-options .patient-sheet-button, .reception-action-options .edit-patient-button { display: block; }
