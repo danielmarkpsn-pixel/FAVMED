@@ -1,11 +1,9 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-// Configure the exact browser origin(s) in Supabase Edge Function secrets.
-// Local default is intentionally limited to the Vite loopback URL; set
-// FAVMED_ALLOWED_ORIGIN to the approved deployed app origin before production.
-const appUrl = (Deno.env.get("FAVMED_APP_URL") || "https://favmed.vercel.app").trim().replace(/\/$/, "");
-const configuredOrigin = (Deno.env.get("FAVMED_ALLOWED_ORIGIN") || "").trim().replace(/\/$/, "");
-const allowedOrigin = configuredOrigin.startsWith("https://") ? configuredOrigin : appUrl;
+// Production invitation destination is fixed to the canonical public application URL.
+ // Never derive invitation redirects from localhost, request headers, or mutable secrets.
+const appUrl = "https://favmed.vercel.app";
+const allowedOrigin = appUrl;
 const corsHeaders = {
   "Access-Control-Allow-Origin": allowedOrigin,
   "Vary": "Origin",
