@@ -708,6 +708,25 @@ async function renderOperationalModules(profile, userId) {
           const additions = [...new Map(selected.concat(other).filter((exam) => exam.name && !existingNames.has(exam.name)).map((exam) => [exam.name, exam])).values()];
           if (additions.length) {
             const roomIdByName = new Map((roomResult.data || []).map((room) => [room.name, room.id]));
+            const { data: currentWorkflows, error: currentWorkflowError } = await supabase.from('visit_room_workflows')
+              .select('room_id').eq('visit_id', visitId);
+            if (currentWorkflowError) throw currentWorkflowError;
+            const existingRoomIds = new Set((currentWorkflows || []).map((workflow) => workflow.room_id));
+            const serviceByRoomName = new Map([
+              ['Sala 1', 'RX'], ['Sala 2', 'Coleta / laboratório'],
+              ['Sala 3', 'Audiometria'], ['Sala 4', 'Exames complementares'],
+            ]);
+            const newWorkflows = [...new Set(additions.map((exam) => roomIdByName.get(exam.roomName)).filter(Boolean))]
+              .filter((roomId) => !existingRoomIds.has(roomId))
+              .map((roomId, index) => {
+                const room = (roomResult.data || []).find((item) => item.id === roomId);
+                const service = serviceByRoomName.get(room?.name) || room?.name || 'Atendimento';
+                return { visit_id: visitId, service_key: service, room_id: roomId, service_label: service, status: 'aguardando', call_label: room?.name || service, display_order: (currentWorkflows || []).length + index };
+              });
+            if (newWorkflows.length) {
+              const { error: workflowInsertError } = await supabase.from('visit_room_workflows').insert(newWorkflows);
+              if (workflowInsertError) throw workflowInsertError;
+            }
             const { error: examsError } = await supabase.from('visit_exams').insert(additions.map((exam, index) => ({ visit_id: visitId, exam_name: exam.name, room_id: roomIdByName.get(exam.roomName) || null, display_order: (existingExams || []).length + index })));
             if (examsError) throw examsError;
           }
