@@ -604,17 +604,18 @@ async function renderOperationalModules(profile, userId) {
     button.disabled = true; button.textContent = 'Gerando backup…';
     try {
       const { data: visits, error: visitsError } = await supabase.from('patient_visits')
-        .select('id, patient_id, visit_date, attendance_type, status, company_name, professional_id, room_id, checked_in_at, started_at, completed_at, priority, aso_pending, aso_completed, created_at')
+        .select('id, patient_id, visit_date, attendance_type, exam_types, status, company_name, professional_id, room_id, initial_room_ids, checked_in_at, started_at, completed_at, priority, aso_pending, aso_completed, reception_call_room_id, reception_call_label, reception_called_at, created_at')
         .eq('visit_date', todayLocal()).order('checked_in_at', { ascending: true });
       if (visitsError) throw visitsError;
       const patientIds = [...new Set((visits || []).map((visit) => visit.patient_id))];
       const visitIds = (visits || []).map((visit) => visit.id);
-      const [patientsResult, examsResult] = await Promise.all([
+      const [patientsResult, examsResult, workflowsResult] = await Promise.all([
         patientIds.length ? supabase.from('patients').select('id, full_name, cpf, birth_date, company_name, insurance, job_title, document_path, created_at').in('id', patientIds) : Promise.resolve({ data: [], error: null }),
         visitIds.length ? supabase.from('visit_exams').select('id, visit_id, exam_name, room_id, status, result_summary, completed_by, completed_at, display_order').in('visit_id', visitIds) : Promise.resolve({ data: [], error: null }),
+        visitIds.length ? supabase.from('visit_room_workflows').select('id, visit_id, service_key, service_label, room_id, status, call_label, called_at, started_at, released_at, updated_by, display_order').in('visit_id', visitIds) : Promise.resolve({ data: [], error: null }),
       ]);
-      if (patientsResult.error || examsResult.error) throw patientsResult.error || examsResult.error;
-      const payload = { exported_at: new Date().toISOString(), date: todayLocal(), visits: visits || [], patients: patientsResult.data || [], exams: examsResult.data || [] };
+      if (patientsResult.error || examsResult.error || workflowsResult.error) throw patientsResult.error || examsResult.error || workflowsResult.error;
+      const payload = { exported_at: new Date().toISOString(), date: todayLocal(), visits: visits || [], patients: patientsResult.data || [], exams: examsResult.data || [], room_workflows: workflowsResult.data || [] };
       const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8;' }));
       const link = document.createElement('a'); link.href = url; link.download = `favmed-backup-${todayLocal()}.json`; link.click(); URL.revokeObjectURL(url);
       operationalMessage('#operational-message', 'Backup JSON gerado. Guarde o arquivo em local seguro.');
