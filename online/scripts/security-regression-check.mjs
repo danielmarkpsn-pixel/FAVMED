@@ -112,3 +112,14 @@ const publicCallsFallbackMigration = await readFile(new URL('../supabase/migrati
 assert.match(publicCallsFallbackMigration, /union all/i);
 assert.match(publicCallsFallbackMigration, /not exists \(select 1 from public\.visit_exams/);
 assert.match(publicCallsFallbackMigration, /grant select on public\.public_waiting_room_calls to anon/);
+
+
+const sharedQueueRlsMigration = await readFile(new URL('../supabase/migrations/20261030120000_professional_shared_queue_read_access.sql', import.meta.url), 'utf8');
+assert.match(sharedQueueRlsMigration, /private\.current_active_role\(\) in \('master', 'recepcao', 'profissional'\)/);
+assert.match(sharedQueueRlsMigration, /create policy patients_select_authorized/);
+assert.match(sharedQueueRlsMigration, /create policy visit_exams_select_authorized/);
+assert.match(sharedQueueRlsMigration, /private\.current_active_role\(\) = 'profissional'/);
+assert.match(sharedQueueRlsMigration, /private\.current_active_role\(\) = 'sala'/);
+assert.match(sharedQueueRlsMigration, /r\.assigned_profile_id = \(select auth\.uid\(\)\)/);
+assert.doesNotMatch(sharedQueueRlsMigration, /create policy .* for update/i);
+assert.doesNotMatch(sharedQueueRlsMigration, /grant update/i);
