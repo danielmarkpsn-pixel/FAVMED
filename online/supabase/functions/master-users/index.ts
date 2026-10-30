@@ -3,7 +3,8 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 // Configure the exact browser origin(s) in Supabase Edge Function secrets.
 // Local default is intentionally limited to the Vite loopback URL; set
 // FAVMED_ALLOWED_ORIGIN to the approved deployed app origin before production.
-const allowedOrigin = (Deno.env.get("FAVMED_ALLOWED_ORIGIN") || "http://localhost:5173").trim();
+const appUrl = (Deno.env.get("FAVMED_APP_URL") || "https://favmed.vercel.app").trim().replace(/\/$/, "");
+const allowedOrigin = (Deno.env.get("FAVMED_ALLOWED_ORIGIN") || appUrl).trim().replace(/\/$/, "");
 const corsHeaders = {
   "Access-Control-Allow-Origin": allowedOrigin,
   "Vary": "Origin",
@@ -122,7 +123,7 @@ Deno.serve(async (req: Request) => {
       return json({ error: "Perfil inválido. O Master inicial não pode ser criado por esta tela." }, 400);
     }
 
-    const { data: created, error: createError } = await admin.auth.admin.inviteUserByEmail(email);
+    const { data: created, error: createError } = await admin.auth.admin.inviteUserByEmail(email, { redirectTo: `${appUrl}/` });
     if (createError || !created.user) {
       const errorText = (createError?.message || "").toLowerCase();
       const errorCode = String((createError as { code?: string } | null)?.code || "").toLowerCase();
