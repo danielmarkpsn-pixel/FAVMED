@@ -314,13 +314,13 @@ declare
   v_visit_id uuid;
   v_room_count integer;
 begin
-  if private.current_active_role() not in ('master', 'recepcao') then
+  if coalesce(private.current_active_role(), '') not in ('master', 'recepcao') then
     raise exception 'Somente a recepção pode cadastrar pacientes na fila.';
   end if;
-  if jsonb_typeof(p_patient) <> 'object'
-     or jsonb_typeof(p_visit) <> 'object'
-     or jsonb_typeof(p_workflows) <> 'array'
-     or jsonb_typeof(coalesce(p_exams, '[]'::jsonb)) <> 'array' then
+  if coalesce(jsonb_typeof(p_patient), '') <> 'object'
+     or coalesce(jsonb_typeof(p_visit), '') <> 'object'
+     or coalesce(jsonb_typeof(p_workflows), '') <> 'array'
+     or coalesce(jsonb_typeof(coalesce(p_exams, '[]'::jsonb)), '') <> 'array' then
     raise exception 'Dados de cadastro inválidos.';
   end if;
   if jsonb_array_length(p_workflows) = 0 then
