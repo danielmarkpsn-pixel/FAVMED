@@ -456,7 +456,7 @@ async function renderOperationalModules(profile, userId) {
                 ? `<button type="button" class="secondary visit-status-button" data-visit-id="${escapeHtml(visit.id)}" data-next-status="atendido">Concluir atendimento</button>`
                 : '')}`
           : profile.role === 'recepcao'
-            ? `${sheetButton} ${editButton} <button type="button" class="secondary priority-toggle-button" data-visit-id="${escapeHtml(visit.id)}" data-next-priority="${!visit.priority}">${visit.priority ? 'Retirar prioridade' : 'Marcar prioridade'}</button> <button type="button" class="secondary aso-toggle-button ${visit.aso_completed ? 'aso-completed' : visit.aso_pending ? 'aso-pending' : ''}" data-visit-id="${escapeHtml(visit.id)}" data-next-aso="${visit.aso_completed ? 'reset' : visit.aso_pending ? 'complete' : 'pending'}">${visit.aso_completed ? 'ASO REALIZADO ✓' : visit.aso_pending ? 'ASO PENDENTE · Marcar realizado' : 'Marcar ASO pendente'}</button>`
+            ? `${sheetButton} ${editButton} ${['Recepção 1','Recepção 2','Recepção 3'].map((label) => { const station = (roomResult.data || []).find((room) => room.name.toLowerCase() === label.toLowerCase()); return station ? `<button type="button" class="secondary reception-call-button" data-visit-id="${escapeHtml(visit.id)}" data-room-id="${escapeHtml(station.id)}">Chamar na ${label}</button>` : ''; }).join(' ')} <button type="button" class="secondary priority-toggle-button" data-visit-id="${escapeHtml(visit.id)}" data-next-priority="${!visit.priority}">${visit.priority ? 'Retirar prioridade' : 'Marcar prioridade'}</button> <button type="button" class="secondary aso-toggle-button ${visit.aso_completed ? 'aso-completed' : visit.aso_pending ? 'aso-pending' : ''}" data-visit-id="${escapeHtml(visit.id)}" data-next-aso="${visit.aso_completed ? 'reset' : visit.aso_pending ? 'complete' : 'pending'}">${visit.aso_completed ? 'ASO REALIZADO ✓' : visit.aso_pending ? 'ASO PENDENTE · Marcar realizado' : 'Marcar ASO pendente'}</button>`
             : '');
       const examLabels = visitExams.length ? visitExams.map((exam) => `<span class="exam-pill">${escapeHtml(exam.exam_name)} · ${escapeHtml(exam.status)}</span>`).join(' ') : '<span class="muted">Sem exames vinculados</span>';
       const patientLabel = roomMode ? `Atendimento #${escapeHtml(visit.id.slice(0, 8))}` : escapeHtml(patient?.full_name || 'Paciente não visível');
@@ -573,6 +573,7 @@ async function renderOperationalModules(profile, userId) {
   document.querySelector('#operational-rows').addEventListener('click', async (event) => {
     const examButton = event.target.closest('.exam-status-button');
     const visitButton = event.target.closest('.visit-status-button');
+    const receptionCallButton = event.target.closest('.reception-call-button');
     const priorityButton = event.target.closest('.priority-toggle-button');
     const asoButton = event.target.closest('.aso-toggle-button');
     const sheetButton = event.target.closest('.patient-sheet-button');
@@ -664,7 +665,21 @@ async function renderOperationalModules(profile, userId) {
       return;
     }
     try {
-      if (examButton) {
+      if (receptionCallButton) {
+        receptionCallButton.disabled = true;
+        const visitId = receptionCallButton.dataset.visitId;
+        const roomId = receptionCallButton.dataset.roomId;
+        const { data: pendingExam, error: pendingError } = await supabase.from('visit_exams').select('id').eq('visit_id', visitId).eq('status', 'pendente').order('display_order').limit(1).maybeSingle();
+        if (pendingError) throw pendingError;
+        if (pendingExam) {
+          const { error } = await supabase.from('visit_exams').update({ status: 'chamado', room_id: roomId }).eq('id', pendingExam.id);
+          if (error) throw error;
+        }
+        const { error: visitError } = await supabase.from('patient_visits').update({ status: 'chamado', room_id: roomId }).eq('id', visitId);
+        if (visitError) throw visitError;
+        operationalMessage('#operational-message', 'Paciente chamado pela recepção.');
+        await loadOperationalRows();
+      } else if (examButton) {
         examButton.disabled = true;
         const nextStatus = examButton.dataset.nextStatus;
         const payload = { status: nextStatus, updated_at: new Date().toISOString() };
@@ -746,6 +761,7 @@ async function renderOperationalModules(profile, userId) {
     } catch (error) {
       operationalMessage('#operational-message', error.message || 'Não foi possível atualizar o status.', true);
       if (examButton) examButton.disabled = false;
+      if (receptionCallButton) receptionCallButton.disabled = false;
       if (visitButton) visitButton.disabled = false;
       if (priorityButton) priorityButton.disabled = false;
       if (asoButton) asoButton.disabled = false;
