@@ -417,3 +417,126 @@ using (
     )
   )
 );
+
+
+-- Local FAVMED has a shared professional queue filtered by service/room, not by
+-- an assigned clinician. Preserve that behavior for unassigned visits while
+-- keeping visits explicitly assigned to another professional private.
+drop policy if exists patients_select_authorized on public.patients;
+create policy patients_select_authorized on public.patients
+for select to authenticated
+using (
+  private.current_active_role() in ('master', 'recepcao')
+  or (
+    private.current_active_role() = 'profissional'
+    and exists (
+      select 1 from public.patient_visits v
+      where v.patient_id = patients.id
+        and (v.professional_id = (select auth.uid()) or v.professional_id is null)
+    )
+  )
+);
+
+drop policy if exists patient_visits_select_authorized on public.patient_visits;
+create policy patient_visits_select_authorized on public.patient_visits
+for select to authenticated
+using (
+  private.current_active_role() in ('master', 'recepcao')
+  or (
+    private.current_active_role() = 'profissional'
+    and (professional_id = (select auth.uid()) or professional_id is null)
+  )
+  or (
+    private.current_active_role() = 'sala'
+    and exists (
+      select 1 from public.rooms r
+      where r.assigned_profile_id = (select auth.uid())
+        and r.active is true
+        and (r.id = patient_visits.room_id or r.id = any(patient_visits.initial_room_ids))
+    )
+  )
+);
+
+drop policy if exists visit_room_workflows_select_authorized on public.visit_room_workflows;
+create policy visit_room_workflows_select_authorized
+on public.visit_room_workflows for select to authenticated
+using (
+  private.current_active_role() in ('master', 'recepcao')
+  or (
+    private.current_active_role() = 'profissional'
+    and exists (
+      select 1 from public.patient_visits v
+      where v.id = visit_room_workflows.visit_id
+        and (v.professional_id = (select auth.uid()) or v.professional_id is null)
+    )
+  )
+  or (
+    private.current_active_role() = 'sala'
+    and exists (
+      select 1 from public.rooms r
+      where r.id = visit_room_workflows.room_id
+        and r.assigned_profile_id = (select auth.uid())
+        and r.active is true
+    )
+  )
+);
+
+drop policy if exists visit_room_workflows_update_professional on public.visit_room_workflows;
+create policy visit_room_workflows_update_professional
+on public.visit_room_workflows for update to authenticated
+using (
+  private.current_active_role() = 'profissional'
+  and exists (
+    select 1 from public.patient_visits v
+    where v.id = visit_room_workflows.visit_id
+      and (v.professional_id = (select auth.uid()) or v.professional_id is null)
+  )
+)
+with check (
+  private.current_active_role() = 'profissional'
+  and exists (
+    select 1 from public.patient_visits v
+    where v.id = visit_room_workflows.visit_id
+      and (v.professional_id = (select auth.uid()) or v.professional_id is null)
+  )
+);
+
+drop policy if exists visit_exams_select_authorized on public.visit_exams;
+create policy visit_exams_select_authorized on public.visit_exams
+for select to authenticated
+using (
+  private.current_active_role() in ('master', 'recepcao')
+  or exists (
+    select 1 from public.patient_visits v
+    where v.id = visit_exams.visit_id
+      and private.current_active_role() = 'profissional'
+      and (v.professional_id = (select auth.uid()) or v.professional_id is null)
+  )
+  or exists (
+    select 1 from public.rooms r
+    where r.id = visit_exams.room_id
+      and r.assigned_profile_id = (select auth.uid())
+      and r.active is true
+      and private.current_active_role() = 'sala'
+  )
+);
+
+drop policy if exists visit_exams_update_professional on public.visit_exams;
+create policy visit_exams_update_professional on public.visit_exams
+for update to authenticated
+using (
+  private.current_active_role() = 'profissional'
+  and exists (
+    select 1 from public.patient_visits v
+    where v.id = visit_exams.visit_id
+      and (v.professional_id = (select auth.uid()) or v.professional_id is null)
+  )
+)
+with check (
+  private.current_active_role() = 'profissional'
+  and exists (
+    select 1 from public.patient_visits v
+    where v.id = visit_exams.visit_id
+      and (v.professional_id = (select auth.uid()) or v.professional_id is null)
+  )
+);
