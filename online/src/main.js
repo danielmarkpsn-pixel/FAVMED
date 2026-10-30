@@ -659,7 +659,7 @@ async function renderOperationalModules(profile, userId) {
           const { error: visitUpdateError } = await supabase.from('patient_visits').update({ company_name: String(values.company_name || '').trim() || null }).eq('id', visitId);
           if (visitUpdateError) throw visitUpdateError;
           const selected = [...form.querySelectorAll('input[name="edit_exam_names"]:checked')].map((input) => ({ name: input.value.trim(), roomName: input.dataset.roomName || '' }));
-          const other = String(values.other_exam_names || '').split(/[\\n,;]/).map((name) => name.trim()).filter(Boolean).map((name) => ({ name, roomName: '' }));
+          const other = String(values.other_exam_names || '').split(/[\n,;]/).map((name) => name.trim()).filter(Boolean).map((name) => ({ name, roomName: '' }));
           const additions = [...new Map(selected.concat(other).filter((exam) => exam.name && !existingNames.has(exam.name)).map((exam) => [exam.name, exam])).values()];
           if (additions.length) {
             const roomIdByName = new Map((roomResult.data || []).map((room) => [room.name, room.id]));
