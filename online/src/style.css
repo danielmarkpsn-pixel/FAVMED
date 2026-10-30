@@ -248,3 +248,94 @@ textarea:focus { outline: 3px solid #087f8c20; border-color: var(--teal); }
 .operational-heading-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .operational-heading-actions a { display: inline-flex; align-items: center; justify-content: center; padding: 10px 14px; border: 1px solid var(--line); border-radius: 10px; color: var(--teal); background: #fff; font-size: 13px; font-weight: 750; text-decoration: none; }
 .operational-heading-actions a:hover { background: #f0f8f8; }
+
+
+/* Recepção: menu de ações flutuante e grade de profissionais */
+.professional-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  gap: 14px;
+  align-items: stretch;
+}
+.professional-card {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid #dce5e9;
+  border-radius: 14px;
+  background: linear-gradient(120deg, #f8fbfc, #fff);
+  box-shadow: 0 8px 24px #1b3a440b;
+}
+.professional-card.blinking {
+  border: 2px solid #087bff;
+  background: linear-gradient(120deg, #e8f2ff, #fff);
+  animation: favmedRoomPulse .9s steps(2, start) infinite;
+}
+.professional-card.attending {
+  border: 3px solid #b42332;
+  background: linear-gradient(120deg, #fff0f0, #fff);
+}
+.professional-card.completed { opacity: .72; }
+.professional-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.professional-card-head strong { display: block; overflow-wrap: anywhere; font-size: 15px; }
+.professional-card-head p { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
+.professional-card-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; color: #526872; font-size: 12px; }
+.professional-card-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: auto; }
+.professional-card-actions .secondary { flex: 1 1 auto; }
+.priority-flag { display: inline-block; margin: 4px 0 0 7px; padding: 3px 7px; border-radius: 6px; background: #fff0c2; color: #805600; font-size: 10px; font-weight: 900; }
+
+.favmed-room-screen .waiting-content { max-width: 1800px; margin-top: clamp(24px, 5vh, 56px); }
+.favmed-room-screen .waiting-content h2 { margin-bottom: 22px; }
+.room-call-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  gap: 16px;
+  width: 100%;
+  align-content: start;
+  align-items: stretch;
+}
+.room-call-card {
+  min-width: 0;
+  min-height: 170px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: clamp(16px, 2vw, 26px);
+  border: 1px solid #b5dfdd;
+  border-radius: 18px;
+  background: linear-gradient(120deg, #e6f7f5, #fff);
+  text-align: center;
+  box-shadow: 0 15px 35px #1b3a440e;
+  animation: appear .35s ease;
+}
+.room-call-card.blinking {
+  border: 2px solid #087bff;
+  background: linear-gradient(120deg, #e8f2ff, #fff);
+  animation: favmedRoomPulse .9s steps(2, start) infinite;
+}
+.room-call-card.blinking .call-label, .room-call-card.blinking .call-name, .room-call-card.blinking .call-room { color: #075bd8; }
+.room-call-card.attending {
+  border: 3px solid #b42332;
+  background: linear-gradient(120deg, #fff0f0, #fff);
+  box-shadow: 0 12px 34px #b4233218;
+}
+.room-call-card.attending .call-label, .room-call-card.attending .call-name, .room-call-card.attending .call-room { color: #9d1c27; }
+.room-call-card .call-label { color: #58747c; letter-spacing: 2px; font-weight: 800; font-size: clamp(12px, 1.5vw, 16px); }
+.room-call-card .call-name { margin: 10px 0; font-size: clamp(22px, 3vw, 42px); line-height: 1.08; font-weight: 850; overflow-wrap: anywhere; }
+.room-call-card .call-room { font-size: clamp(16px, 1.8vw, 28px); color: var(--teal); font-weight: 750; overflow-wrap: anywhere; }
+.room-error { grid-column: 1 / -1; margin: 0; padding: 28px; border: 1px solid #efc8cc; border-radius: 14px; background: #fff0f0; color: #a01e2b; font-weight: 750; text-align: center; }
+#room-call-signal { display: none; }
+@keyframes favmedRoomPulse {
+  0%, 49% { background: #dbeaff; border-color: #087bff; box-shadow: 0 0 0 3px #087bff30; }
+  50%, 100% { background: #fff; border-color: #fff; box-shadow: 0 0 0 1px #087bff20; }
+}
+@media (max-width: 640px) {
+  .professional-cards, .room-call-grid { grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 8px; }
+  .professional-card { padding: 12px; }
+  .professional-card-head { flex-direction: column; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .professional-card.blinking, .room-call-card.blinking { animation: none; }
+}
