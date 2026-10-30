@@ -75,7 +75,8 @@ export function localPatientToOnline(patient, roomRows) {
     throw new Error('A estação de recepção da chamada não está cadastrada ou ativa.');
   }
 
-  const overallStatus = patient.status === 'Atendido' ? 'atendido'
+  const allReleased = workflows.length > 0 && workflows.every((item) => item.status === 'liberado');
+  const overallStatus = allReleased ? 'atendido'
     : workflows.some((item) => item.status === 'em_atendimento') ? 'em_atendimento'
       : workflows.some((item) => item.status === 'chamado') ? 'chamado' : 'aguardando';
 
