@@ -92,3 +92,21 @@ A migração deve trocar os adaptadores de persistência e identidade, não os f
 - Não publicar em produção.
 - Não usar dados reais de pacientes nos testes.
 - Não expor credenciais administrativas ou arquivos clínicos.
+
+
+## Incompatibilidade funcional crítica identificada
+
+O painel local do profissional não trabalha apenas com status global da visita ou status por exame. Ele mantém `serviceStates[serviço]` para cada serviço/sala do paciente, com estados próprios `Aguardando`, `Chamado`, `Atendendo` e `Liberado`. O profissional seleciona um serviço (RX, Coleta/laboratório, Audiometria, Exames complementares ou ASO) e altera somente o estado daquele serviço.
+
+Já o esquema online atual possui:
+- um único `patient_visits.status` para a visita;
+- vários `visit_exams.status` por exame individual;
+- `rooms` para cadastro e atribuição.
+
+Não existe atualmente uma tabela que represente o estado independente de cada serviço/sala dentro da mesma visita. Tratar cada exame como se fosse um serviço ou usar somente `patient_visits.status` muda o fluxo original e pode fazer uma chamada/conclusão interferir nas outras salas.
+
+**Decisão necessária antes de implementar a camada de dados:** adicionar, em branch e após revisão, uma entidade de fluxo por sala/serviço (por exemplo `visit_room_workflows`) ligada a `patient_visits` e `rooms`, com estado, rótulo da chamada, timestamps e ordem. Os exames continuam em `visit_exams`, associados à sala correspondente. O status geral da visita será derivado dos fluxos por sala, seguindo exatamente a regra local: só marcar atendido quando todos os serviços estiverem liberados.
+
+A chamada de Recepção 1/2/3 também é um fluxo separado da chamada para sala de exame e precisa de campos/eventos próprios, sem reutilizar indevidamente o status de um exame.
+
+Essa estrutura evita uma conversão superficial que pareça funcionar na recepção, mas altere a operação do painel profissional.
