@@ -4,7 +4,8 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 // Local default is intentionally limited to the Vite loopback URL; set
 // FAVMED_ALLOWED_ORIGIN to the approved deployed app origin before production.
 const appUrl = (Deno.env.get("FAVMED_APP_URL") || "https://favmed.vercel.app").trim().replace(/\/$/, "");
-const allowedOrigin = (Deno.env.get("FAVMED_ALLOWED_ORIGIN") || appUrl).trim().replace(/\/$/, "");
+const configuredOrigin = (Deno.env.get("FAVMED_ALLOWED_ORIGIN") || "").trim().replace(/\/$/, "");
+const allowedOrigin = configuredOrigin.startsWith("https://") ? configuredOrigin : appUrl;
 const corsHeaders = {
   "Access-Control-Allow-Origin": allowedOrigin,
   "Vary": "Origin",
