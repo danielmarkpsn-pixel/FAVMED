@@ -401,12 +401,13 @@ async function renderOperationalModules(profile, userId) {
       if (visitIds.length) {
         const { data, error } = await supabase.from('patient_visits')
           .select('id, patient_id, visit_date, attendance_type, status, checked_in_at')
-          .in('id', visitIds).eq('visit_date', todayLocal()).order('checked_in_at', { ascending: false });
+          .in('id', visitIds).eq('visit_date', todayLocal()).neq('status', 'cancelado').order('checked_in_at', { ascending: false });
         if (error) { rows.innerHTML = '<tr><td colspan="4">Não foi possível carregar a fila desta sala.</td></tr>'; return; }
         visits = data || [];
       }
       return renderRows(visits, exams || [], true);
     }
+    visitsQuery = visitsQuery.neq('status', 'cancelado');
     const { data: visits, error } = await visitsQuery;
     if (error) {
       rows.innerHTML = '<tr><td colspan="4">Não foi possível carregar a fila. Verifique se a migração operacional foi aplicada e se as políticas RLS estão ativas.</td></tr>';
@@ -430,6 +431,7 @@ async function renderOperationalModules(profile, userId) {
     const count = document.querySelector('#operational-count');
     if (!rows) return;
     lastPatientsById = new Map(patients.map((patient) => [patient.id, patient]));
+    lastVisitsById = new Map(visits.map((visit) => [visit.id, visit]));
     const term = document.querySelector('#operational-search')?.value.trim().toLocaleLowerCase('pt-BR') || '';
     const selectedRoomId = document.querySelector('#professional-room-filter')?.value || '';
     visits = visits.filter((visit) => {
@@ -440,11 +442,54 @@ async function renderOperationalModules(profile, userId) {
       return matchesRoom && (!term || searchable.includes(term));
     }).sort((a, b) => Number(Boolean(b.priority)) - Number(Boolean(a.priority)) || new Date(a.checked_in_at || 0) - new Date(b.checked_in_at || 0));
     count.textContent = `${visits.length} atendimento(s)`;
+    const patientMap = new Map(patients.map((patient) => [patient.id, patient]));
+    if (profile.role === 'recepcao') {
+      const editSelect = document.querySelector('#edit-patient-select');
+      const editButton = document.querySelector('#edit-patient-open');
+      if (editSelect) {
+        const previous = editSelect.value;
+        editSelect.innerHTML = '<option value="">Selecione um paciente da fila</option>' + visits.filter((visit) => patientMap.has(visit.patient_id)).map((visit) => '<option value="' + escapeHtml(visit.id) + '">' + escapeHtml(patientMap.get(visit.patient_id).full_name || 'Paciente') + ' · ' + escapeHtml(visit.attendance_type || 'Atendimento') + '</option>').join('');
+        if (previous && [...editSelect.options].some((option) => option.value === previous)) editSelect.value = previous;
+        const selectedVisit = lastVisitsById.get(editSelect.value);
+        const selectedPatient = selectedVisit && patientMap.get(selectedVisit.patient_id);
+        if (editButton) {
+          editButton.disabled = !selectedPatient;
+          editButton.dataset.patientId = selectedPatient?.id || '';
+          editButton.dataset.visitId = selectedVisit?.id || '';
+        }
+      }
+    }
     if (!visits.length) {
-      rows.innerHTML = '<tr><td colspan="4">Nenhum atendimento encontrado.</td></tr>';
+      rows.innerHTML = profile.role === 'profissional' ? '<div class="empty">Nenhum atendimento encontrado para hoje.</div>' : '<tr><td colspan="4">Nenhum atendimento encontrado.</td></tr>';
       return;
     }
-    const patientMap = new Map(patients.map((patient) => [patient.id, patient]));
+    if (profile.role === 'profissional') {
+      const cards = visits.flatMap((visit) => {
+        const patient = patientMap.get(visit.patient_id);
+        const visitExams = exams.filter((exam) => exam.visit_id === visit.id);
+        const getRoomName = (roomId) => (roomResult.data || []).find((room) => room.id === roomId)?.name || 'Sala não definida';
+        const name = escapeHtml(patient?.full_name || 'Paciente não identificado');
+        const ficha = patient ? '<button type="button" class="secondary patient-sheet-button" data-patient-id="' + escapeHtml(patient.id) + '" data-visit-id="' + escapeHtml(visit.id) + '">Visualizar Ficha</button>' : '';
+        const priority = visit.priority ? '<span class="priority-flag">PRIORIDADE</span>' : '';
+        const makeCard = (exam, status, roomName, actions) => '<article class="professional-card ' + (status === 'chamado' ? 'blinking' : status === 'em_atendimento' ? 'attending' : status === 'atendido' || status === 'realizado' ? 'completed' : '') + '"><div class="professional-card-head"><div><strong>' + name + priority + '</strong><p>' + escapeHtml(visit.attendance_type || 'Atendimento') + '</p></div>' + ficha + '</div><div class="professional-card-meta">' + (exam ? '<strong>' + escapeHtml(exam.exam_name) + '</strong>' : '') + '<span>' + escapeHtml(roomName) + '</span><span class="status-pill">' + escapeHtml(operationalStatuses[status] || status) + '</span></div><div class="professional-card-actions">' + actions + '</div></article>';
+        if (!visitExams.length) {
+          const status = visit.status || 'aguardando';
+          const actions = status === 'aguardando' ? '<button type="button" class="secondary visit-status-button" data-visit-id="' + escapeHtml(visit.id) + '" data-next-status="chamado">🔊 Chamar paciente</button>'
+            : status === 'chamado' ? '<button type="button" class="secondary visit-status-button" data-visit-id="' + escapeHtml(visit.id) + '" data-next-status="em_atendimento">Iniciar atendimento</button><button type="button" class="secondary repeat-call-button" data-visit-id="' + escapeHtml(visit.id) + '">Repetir chamada</button><button type="button" class="secondary cancel-call-button" data-visit-id="' + escapeHtml(visit.id) + '">Cancelar chamada</button>'
+            : status === 'em_atendimento' ? '<button type="button" class="secondary visit-status-button" data-visit-id="' + escapeHtml(visit.id) + '" data-next-status="atendido">Concluir atendimento</button>' : '<span class="status-pill active">Atendimento realizado</span>';
+          return [makeCard(null, status, getRoomName(visit.room_id), actions)];
+        }
+        return visitExams.map((exam) => {
+          const status = exam.status || visit.status || 'pendente';
+          const actions = status === 'pendente' ? '<button type="button" class="secondary exam-status-button" data-exam-id="' + escapeHtml(exam.id) + '" data-next-status="chamado">🔊 Chamar paciente</button>'
+            : status === 'chamado' ? '<button type="button" class="secondary exam-status-button" data-exam-id="' + escapeHtml(exam.id) + '" data-next-status="em_atendimento">Iniciar atendimento</button><button type="button" class="secondary repeat-exam-call-button" data-exam-id="' + escapeHtml(exam.id) + '">Repetir chamada</button><button type="button" class="secondary cancel-exam-call-button" data-exam-id="' + escapeHtml(exam.id) + '">Cancelar chamada</button>'
+            : status === 'em_atendimento' ? '<button type="button" class="secondary exam-status-button" data-exam-id="' + escapeHtml(exam.id) + '" data-next-status="realizado">Concluir exame</button>' : '<span class="status-pill active">Exame realizado</span>';
+          return makeCard(exam, status, getRoomName(exam.room_id), actions);
+        });
+      }).join('');
+      rows.innerHTML = cards || '<div class="empty">Nenhum atendimento encontrado.</div>';
+      return;
+    }
     rows.innerHTML = visits.map((visit) => {
       const patient = patientMap.get(visit.patient_id);
       const visitExams = exams.filter((exam) => exam.visit_id === visit.id);
