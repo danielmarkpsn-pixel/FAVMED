@@ -293,3 +293,102 @@ where v.visit_date = current_date
 
 revoke all on public.public_waiting_room_calls from public, authenticated;
 grant select on public.public_waiting_room_calls to anon;
+
+
+-- Atomic reception check-in: patient, visit, per-room workflows and requested
+-- exams are committed together or rolled back together. SECURITY INVOKER keeps
+-- all existing RLS policies in force; no service-role bypass is introduced.
+create or replace function public.create_local_compatible_visit(
+  p_patient jsonb,
+  p_visit jsonb,
+  p_workflows jsonb,
+  p_exams jsonb default '[]'::jsonb
+)
+returns uuid
+language plpgsql
+security invoker
+set search_path = pg_catalog, public, private
+as $$
+declare
+  v_patient_id uuid;
+  v_visit_id uuid;
+  v_room_count integer;
+begin
+  if private.current_active_role() not in ('master', 'recepcao') then
+    raise exception 'Somente a recepção pode cadastrar pacientes na fila.';
+  end if;
+  if jsonb_typeof(p_patient) <> 'object'
+     or jsonb_typeof(p_visit) <> 'object'
+     or jsonb_typeof(p_workflows) <> 'array'
+     or jsonb_array_length(p_workflows) = 0
+     or jsonb_typeof(coalesce(p_exams, '[]'::jsonb)) <> 'array' then
+    raise exception 'Dados de cadastro inválidos.';
+  end if;
+
+  select count(*) into v_room_count
+  from jsonb_to_recordset(p_workflows) as w(room_id uuid)
+  join public.rooms r on r.id = w.room_id
+  where r.active is true and r.room_type <> 'recepcao';
+  if v_room_count <> jsonb_array_length(p_workflows) then
+    raise exception 'Uma ou mais salas selecionadas não existem ou estão inativas.';
+  end if;
+
+  insert into public.patients (
+    full_name, cpf, birth_date, company_name, insurance, job_title, created_by
+  ) values (
+    nullif(trim(p_patient->>'full_name'), ''),
+    nullif(regexp_replace(coalesce(p_patient->>'cpf', ''), '\D', '', 'g'), ''),
+    nullif(p_patient->>'birth_date', '')::date,
+    nullif(trim(p_patient->>'company_name'), ''),
+    nullif(trim(p_patient->>'insurance'), ''),
+    nullif(trim(p_patient->>'job_title'), ''),
+    (select auth.uid())
+  ) returning id into v_patient_id;
+
+  insert into public.patient_visits (
+    patient_id, visit_date, attendance_type, exam_types, status,
+    company_name, professional_id, room_id, initial_room_ids,
+    priority, aso_pending, aso_completed, checked_in_at, created_by
+  ) values (
+    v_patient_id,
+    coalesce(nullif(p_visit->>'visit_date', '')::date, current_date),
+    coalesce(nullif(p_visit->>'attendance_type', ''), 'Pontual'),
+    coalesce(array(select jsonb_array_elements_text(coalesce(p_visit->'exam_types', '[]'::jsonb))), '{}'),
+    'aguardando',
+    nullif(trim(p_visit->>'company_name'), ''),
+    nullif(p_visit->>'professional_id', '')::uuid,
+    nullif(p_visit->>'room_id', '')::uuid,
+    coalesce(array(select jsonb_array_elements_text(coalesce(p_visit->'initial_room_ids', '[]'::jsonb))::uuid), '{}'),
+    coalesce((p_visit->>'priority')::boolean, false),
+    coalesce((p_visit->>'aso_pending')::boolean, false),
+    false,
+    coalesce(nullif(p_visit->>'checked_in_at', '')::timestamptz, now()),
+    (select auth.uid())
+  ) returning id into v_visit_id;
+
+  insert into public.visit_room_workflows (
+    visit_id, service_key, room_id, service_label, status, call_label, display_order
+  )
+  select v_visit_id, w.service_key, w.room_id, w.service_label,
+         coalesce(nullif(w.status, ''), 'aguardando'),
+         nullif(w.call_label, ''), coalesce(w.display_order, 0)
+  from jsonb_to_recordset(p_workflows) as w(
+    service_key text, room_id uuid, service_label text, status text,
+    call_label text, display_order integer
+  );
+
+  if jsonb_array_length(coalesce(p_exams, '[]'::jsonb)) > 0 then
+    insert into public.visit_exams (visit_id, exam_name, room_id, display_order)
+    select v_visit_id, e.exam_name, e.room_id, coalesce(e.display_order, 0)
+    from jsonb_to_recordset(p_exams) as e(
+      exam_name text, room_id uuid, display_order integer
+    )
+    where nullif(trim(e.exam_name), '') is not null;
+  end if;
+
+  return v_visit_id;
+end;
+$$;
+
+revoke all on function public.create_local_compatible_visit(jsonb, jsonb, jsonb, jsonb) from public, anon;
+grant execute on function public.create_local_compatible_visit(jsonb, jsonb, jsonb, jsonb) to authenticated;
