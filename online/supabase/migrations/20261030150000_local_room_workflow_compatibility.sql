@@ -122,11 +122,12 @@ grant update (status, call_label, called_at, started_at, released_at, updated_by
 
 -- Reception-station calls are separate from exam/room calls.
 alter table public.patient_visits
+  add column if not exists exam_types text[] not null default '{}',
   add column if not exists reception_call_room_id uuid references public.rooms(id) on delete set null,
   add column if not exists reception_call_label text,
   add column if not exists reception_called_at timestamptz;
 
-grant update (reception_call_room_id, reception_call_label, reception_called_at)
+grant update (exam_types, reception_call_room_id, reception_call_label, reception_called_at)
   on public.patient_visits to authenticated;
 
 create or replace function private.guard_reception_station_call()
@@ -233,6 +234,35 @@ join public.rooms r on r.id = w.room_id
 where v.visit_date = current_date
   and w.status in ('chamado', 'em_atendimento')
   and w.called_at is not null;
+
+
+union all
+
+-- Backward compatibility for visits created by the current online interface.
+select
+  case
+    when position(' ' in trim(p.full_name)) > 0 then
+      regexp_replace(trim(p.full_name), '\\s+.*
+grant select on public.public_waiting_room_calls to anon;
+, '')
+      || ' '
+      || left(regexp_replace(trim(p.full_name), '^.*\\s+', ''), 1)
+      || '.'
+    else regexp_replace(trim(p.full_name), '\\s+.*
+grant select on public.public_waiting_room_calls to anon;
+, '')
+  end as display_name,
+  coalesce(r.name, 'Recepção') as room_name,
+  coalesce(v.started_at, v.updated_at) as called_at
+from public.patient_visits v
+join public.patients p on p.id = v.patient_id
+left join public.rooms r on r.id = v.room_id
+where v.visit_date = current_date
+  and v.status in ('chamado', 'em_atendimento')
+  and not exists (
+    select 1 from public.visit_room_workflows w
+    where w.visit_id = v.id and w.status in ('chamado', 'em_atendimento')
+  )
 
 revoke all on public.public_waiting_room_calls from public, authenticated;
 grant select on public.public_waiting_room_calls to anon;
