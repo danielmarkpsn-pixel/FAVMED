@@ -230,6 +230,7 @@ async function renderOperationalModules(profile, userId) {
   if (!panel) return;
   const canRegister = profile.role === 'recepcao';
   panel.innerHTML = `
+    <style>.row-action-menu{position:relative;display:inline-block}.row-action-menu>summary{list-style:none;cursor:pointer}.row-action-menu>summary::-webkit-details-marker{display:none}.row-action-menu[open] .row-action-options{display:flex;flex-direction:column;gap:6px;position:absolute;right:0;top:calc(100% + 4px);z-index:20;min-width:210px;max-height:320px;overflow:auto;padding:10px;background:#fff;border:1px solid #d7e2e8;border-radius:10px;box-shadow:0 8px 24px rgba(11,36,53,.12)}.patient-row-flags{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}</style>
     <div class="operational-heading">
       <div><p class="eyebrow">OPERAÇÃO CLÍNICA</p><h2>Módulos operacionais: ${profile.role === 'recepcao' ? 'RECEPÇÃO' : 'PROFISSIONAIS'}</h2><p class="muted">${profile.role === 'recepcao' ? 'Cadastro de pacientes, organização de salas, chamadas e acompanhamento da fila.' : 'Fila de atendimentos, chamadas, execução e conclusão dos exames.'}</p></div>
       <div class="operational-heading-actions"><a class="secondary" href="/sala" target="_blank" rel="noopener noreferrer">Abrir tela de chamadas</a><button class="secondary" id="refresh-operational" type="button">Atualizar dados</button></div>
@@ -300,7 +301,7 @@ async function renderOperationalModules(profile, userId) {
         ${profile.role === 'recepcao' ? '<button class="secondary" id="backup-operational-json" type="button">Backup JSON</button>' : ''}
       </div>
       <div class="table-wrap"><table class="users-table operational-table">
-        <thead><tr><th>Paciente / Atendimento</th><th>Exames</th><th>Status</th><th>Ação</th></tr></thead>
+        <thead><tr><th>Paciente</th><th>Salas</th><th>Status</th><th>Ação</th></tr></thead>
         <tbody id="operational-rows"><tr><td colspan="4">Carregando dados…</td></tr></tbody>
       </table></div>
       <p id="operational-message" class="message" role="status"></p>
@@ -361,7 +362,7 @@ async function renderOperationalModules(profile, userId) {
     if (!rows) return;
     rows.innerHTML = '<tr><td colspan="4">Carregando dados…</td></tr>';
     let visitsQuery = supabase.from('patient_visits')
-      .select('id, patient_id, visit_date, attendance_type, status, professional_id, room_id, checked_in_at, priority, aso_pending, aso_completed')
+      .select('id, patient_id, visit_date, attendance_type, status, professional_id, room_id, initial_room_ids, checked_in_at, priority, aso_pending, aso_completed')
       .eq('visit_date', todayLocal())
       .order('checked_in_at', { ascending: false }).limit(100);
     let assignedRoomId = '';
@@ -437,7 +438,7 @@ async function renderOperationalModules(profile, userId) {
       const status = (roomMode || profile.role === 'profissional') && visitExams.length
         ? (visitExams.some((exam) => exam.status === 'em_atendimento') ? 'em_atendimento' : visitExams.some((exam) => exam.status === 'chamado') ? 'chamado' : visitExams.every((exam) => exam.status === 'realizado') ? 'atendido' : visit.status)
         : visit.status;
-      const sheetButton = !roomMode && patient ? `<button type="button" class="secondary patient-sheet-button" data-patient-id="${escapeHtml(patient.id)}">Visualizar Ficha</button>` : '';
+      const sheetButton = !roomMode && patient ? `<button type="button" class="secondary patient-sheet-button" data-patient-id="${escapeHtml(patient.id)}" data-visit-id="${escapeHtml(visit.id)}">Visualizar Ficha</button>` : '';
       const editButton = profile.role === 'recepcao' && patient ? `<button type="button" class="secondary edit-patient-button" data-patient-id="${escapeHtml(patient.id)}" data-visit-id="${escapeHtml(visit.id)}">Editar / adicionar exames</button>` : '';
       const action = roomMode
         ? visitExams.map((exam) => `<button type="button" class="secondary exam-status-button" data-exam-id="${escapeHtml(exam.id)}" data-next-status="${exam.status === 'pendente' ? 'em_atendimento' : 'realizado'}">${escapeHtml(exam.exam_name)}: ${exam.status === 'pendente' ? 'Iniciar' : 'Marcar realizado'}</button>`).join(' ')
@@ -458,12 +459,12 @@ async function renderOperationalModules(profile, userId) {
           : profile.role === 'recepcao'
             ? `${sheetButton} ${editButton} ${['Recepção 1','Recepção 2','Recepção 3'].map((label) => { const station = (roomResult.data || []).find((room) => room.name.toLowerCase() === label.toLowerCase()); return station ? `<button type="button" class="secondary reception-call-button" data-visit-id="${escapeHtml(visit.id)}" data-room-id="${escapeHtml(station.id)}">Chamar na ${label}</button>` : ''; }).join(' ')} <button type="button" class="secondary priority-toggle-button" data-visit-id="${escapeHtml(visit.id)}" data-next-priority="${!visit.priority}">${visit.priority ? 'Retirar prioridade' : 'Marcar prioridade'}</button> <button type="button" class="secondary aso-toggle-button ${visit.aso_completed ? 'aso-completed' : visit.aso_pending ? 'aso-pending' : ''}" data-visit-id="${escapeHtml(visit.id)}" data-next-aso="${visit.aso_completed ? 'reset' : visit.aso_pending ? 'complete' : 'pending'}">${visit.aso_completed ? 'ASO REALIZADO ✓' : visit.aso_pending ? 'ASO PENDENTE · Marcar realizado' : 'Marcar ASO pendente'}</button>`
             : '');
-      const examLabels = visitExams.length ? visitExams.map((exam) => `<span class="exam-pill">${escapeHtml(exam.exam_name)} · ${escapeHtml(exam.status)}</span>`).join(' ') : '<span class="muted">Sem exames vinculados</span>';
+      const roomNames = [...new Set(visitExams.map((exam) => (roomResult.data || []).find((room) => room.id === exam.room_id)?.name).filter(Boolean).concat((visit.initial_room_ids || []).map((id) => (roomResult.data || []).find((room) => room.id === id)?.name).filter(Boolean)))];
+      const roomLabels = roomNames.length ? roomNames.map((name) => `<span class="exam-pill">${escapeHtml(name)}</span>`).join(' ') : '<span class="muted">Sala não definida</span>';
       const patientLabel = roomMode ? `Atendimento #${escapeHtml(visit.id.slice(0, 8))}` : escapeHtml(patient?.full_name || 'Paciente não visível');
       const flags = profile.role === 'recepcao' ? `${visit.priority ? '<span class="priority-flag">PRIORIDADE</span>' : ''}${visit.aso_completed ? '<span class="aso-flag aso-completed">ASO REALIZADO</span>' : visit.aso_pending ? '<span class="aso-flag aso-pending">ASO PENDENTE</span>' : ''}` : '';
-      const company = patient?.company_name ? `<br><small>${escapeHtml(patient.company_name)}</small>` : '';
-      const extraPatient = patient?.insurance || patient?.job_title ? `<br><small>${escapeHtml([patient.insurance, patient.job_title].filter(Boolean).join(' · '))}</small>` : '';
-      return `<tr><td><strong>${patientLabel}</strong> ${flags}${company}${extraPatient}<br><small>${escapeHtml(visit.attendance_type)} · ${escapeHtml(visit.visit_date)}</small></td><td>${examLabels}</td><td><span class="status-pill ${status === 'atendido' ? 'active' : status === 'cancelado' ? 'inactive' : ''}">${escapeHtml(operationalStatuses[status] || status)}</span></td><td>${action || '<span class="muted">—</span>'}</td></tr>`;
+      const receptionAction = profile.role === 'recepcao' ? `<details class="row-action-menu"><summary class="secondary">Selecione</summary><div class="row-action-options">${sheetButton} ${editButton} ${['Recepção 1','Recepção 2','Recepção 3'].map((label) => { const station = (roomResult.data || []).find((room) => room.name.toLowerCase() === label.toLowerCase()); return station ? `<button type="button" class="secondary reception-call-button" data-visit-id="${escapeHtml(visit.id)}" data-room-id="${escapeHtml(station.id)}">Chamar na ${label}</button>` : ''; }).join(' ')} <button type="button" class="secondary priority-toggle-button" data-visit-id="${escapeHtml(visit.id)}" data-next-priority="${!visit.priority}">${visit.priority ? 'Retirar prioridade' : 'Marcar prioridade'}</button> <button type="button" class="secondary aso-toggle-button ${visit.aso_completed ? 'aso-completed' : visit.aso_pending ? 'aso-pending' : ''}" data-visit-id="${escapeHtml(visit.id)}" data-next-aso="${visit.aso_completed ? 'reset' : visit.aso_pending ? 'complete' : 'pending'}">${visit.aso_completed ? 'ASO REALIZADO ✓' : visit.aso_pending ? 'ASO PENDENTE · Marcar realizado' : 'Marcar ASO pendente'}</button></div></details>` : action;
+      return `<tr><td><strong>${patientLabel}</strong><div class="patient-row-flags">${flags}</div></td><td>${roomLabels}</td><td><span class="status-pill ${status === 'atendido' ? 'active' : status === 'cancelado' ? 'inactive' : ''}">${escapeHtml(operationalStatuses[status] || status)}</span></td><td>${receptionAction || '<span class="muted">—</span>'}</td></tr>`;
     }).join('');
   }
 
@@ -585,9 +586,15 @@ async function renderOperationalModules(profile, userId) {
     if (sheetButton) {
       const patient = lastPatientsById.get(sheetButton.dataset.patientId);
       if (!patient) return;
+      const visitId = sheetButton.dataset.visitId;
+      const { data: sheetExams, error: sheetExamsError } = await supabase.from('visit_exams')
+        .select('exam_name, status, room_id, display_order').eq('visit_id', visitId).order('display_order');
+      if (sheetExamsError) { operationalMessage('#operational-message', `Não foi possível carregar os exames desta ficha: ${sheetExamsError.message}`, true); return; }
+      const roomById = new Map((roomResult.data || []).map((room) => [room.id, room.name]));
+      const sheetExamMarkup = (sheetExams || []).map((exam) => `<li>${escapeHtml(exam.exam_name)} — ${escapeHtml(roomById.get(exam.room_id) || 'Sala não definida')} — ${escapeHtml(operationalStatuses[exam.status] || exam.status)}</li>`).join('') || '<li>Nenhum exame vinculado a este atendimento.</li>';
       const dialog = document.createElement('dialog');
       dialog.className = 'patient-sheet-dialog';
-      dialog.innerHTML = `<form method="dialog"><button class="secondary dialog-close" aria-label="Fechar">Fechar</button></form><h2>Ficha do paciente</h2><dl><dt>Nome</dt><dd>${escapeHtml(patient.full_name || '')}</dd><dt>CPF</dt><dd>${escapeHtml(patient.cpf || '—')}</dd><dt>Data de nascimento</dt><dd>${escapeHtml(patient.birth_date || '—')}</dd><dt>Empresa</dt><dd>${escapeHtml(patient.company_name || '—')}</dd><dt>Convênio</dt><dd>${escapeHtml(patient.insurance || '—')}</dd><dt>Função / cargo</dt><dd>${escapeHtml(patient.job_title || '—')}</dd></dl>${patient.document_path ? '<button type="button" class="secondary" id="generate-patient-pdf-link">Gerar link seguro do PDF</button><a id="patient-pdf-link" class="secondary" hidden target="_blank" rel="noopener noreferrer">Abrir PDF (expira em 5 minutos)</a><p id="patient-pdf-message" class="message" role="status"></p>' : '<p class="muted">Nenhum PDF anexado.</p>'}`;
+      dialog.innerHTML = `<form method="dialog"><button class="secondary dialog-close" aria-label="Fechar">Fechar</button></form><h2>Ficha deste atendimento</h2><dl><dt>Nome</dt><dd>${escapeHtml(patient.full_name || '')}</dd><dt>CPF</dt><dd>${escapeHtml(patient.cpf || '—')}</dd><dt>Data de nascimento</dt><dd>${escapeHtml(patient.birth_date || '—')}</dd><dt>Empresa</dt><dd>${escapeHtml(patient.company_name || '—')}</dd><dt>Convênio</dt><dd>${escapeHtml(patient.insurance || '—')}</dd><dt>Função / cargo</dt><dd>${escapeHtml(patient.job_title || '—')}</dd></dl><h3>Exames deste atendimento</h3><ul>${sheetExamMarkup}</ul>${patient.document_path ? '<button type="button" class="secondary" id="generate-patient-pdf-link">Gerar link seguro do PDF</button><a id="patient-pdf-link" class="secondary" hidden target="_blank" rel="noopener noreferrer">Abrir PDF (expira em 5 minutos)</a><p id="patient-pdf-message" class="message" role="status"></p>' : '<p class="muted">Nenhum PDF anexado.</p>'}`;
       document.body.append(dialog);
       if (typeof dialog.showModal === 'function') dialog.showModal(); else dialog.setAttribute('open', '');
       dialog.addEventListener('close', () => dialog.remove(), { once: true });
@@ -612,7 +619,8 @@ async function renderOperationalModules(profile, userId) {
       const patient = lastPatientsById.get(editPatientButton.dataset.patientId);
       if (!patient) return;
       const visitId = editPatientButton.dataset.visitId;
-      const { data: existingExams } = await supabase.from('visit_exams').select('exam_name').eq('visit_id', visitId);
+      const { data: existingExams, error: existingExamsError } = await supabase.from('visit_exams').select('exam_name').eq('visit_id', visitId);
+      if (existingExamsError) { operationalMessage('#operational-message', `Não foi possível carregar os exames para edição: ${existingExamsError.message}`, true); return; }
       const existingNames = new Set((existingExams || []).map((exam) => exam.exam_name));
       const examMarkup = Object.entries(examCatalog).map(([roomName, exams]) => `<details class="exam-room-menu"><summary>${escapeHtml(roomName)} — exames disponíveis</summary><div class="service-options">${exams.map((exam) => `<label class="service-option"><input type="checkbox" name="edit_exam_names" data-room-name="${roomName}" value="${escapeHtml(exam)}" ${existingNames.has(exam) ? 'disabled' : ''}> ${escapeHtml(exam)} ${existingNames.has(exam) ? '<small>(já cadastrado)</small>' : ''}</label>`).join('')}</div></details>`).join('');
       const dialog = document.createElement('dialog');
@@ -651,7 +659,7 @@ async function renderOperationalModules(profile, userId) {
           const { error: visitUpdateError } = await supabase.from('patient_visits').update({ company_name: String(values.company_name || '').trim() || null }).eq('id', visitId);
           if (visitUpdateError) throw visitUpdateError;
           const selected = [...form.querySelectorAll('input[name="edit_exam_names"]:checked')].map((input) => ({ name: input.value.trim(), roomName: input.dataset.roomName || '' }));
-          const other = String(values.other_exam_names || '').split(/[\\n,;]/).map((name) => name.trim()).filter(Boolean).map((name) => ({ name, roomName: '' }));
+          const other = String(values.other_exam_names || '').split(/[\n,;]/).map((name) => name.trim()).filter(Boolean).map((name) => ({ name, roomName: '' }));
           const additions = [...new Map(selected.concat(other).filter((exam) => exam.name && !existingNames.has(exam.name)).map((exam) => [exam.name, exam])).values()];
           if (additions.length) {
             const roomIdByName = new Map((roomResult.data || []).map((room) => [room.name, room.id]));
