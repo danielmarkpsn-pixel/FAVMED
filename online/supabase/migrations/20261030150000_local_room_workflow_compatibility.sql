@@ -392,3 +392,26 @@ $$;
 
 revoke all on function public.create_local_compatible_visit(jsonb, jsonb, jsonb, jsonb) from public, anon;
 grant execute on function public.create_local_compatible_visit(jsonb, jsonb, jsonb, jsonb) to authenticated;
+
+
+-- A room account must see a visit when its room is any of the visit's selected
+-- rooms, not only when it happens to be the first room_id.
+drop policy if exists patient_visits_select_authorized on public.patient_visits;
+create policy patient_visits_select_authorized on public.patient_visits
+for select to authenticated
+using (
+  private.current_active_role() in ('master', 'recepcao')
+  or (
+    private.current_active_role() = 'profissional'
+    and professional_id = (select auth.uid())
+  )
+  or (
+    private.current_active_role() = 'sala'
+    and exists (
+      select 1 from public.rooms r
+      where r.assigned_profile_id = (select auth.uid())
+        and r.active is true
+        and (r.id = patient_visits.room_id or r.id = any(patient_visits.initial_room_ids))
+    )
+  )
+);
