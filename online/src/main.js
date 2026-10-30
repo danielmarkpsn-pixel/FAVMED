@@ -454,7 +454,7 @@ async function renderOperationalModules(profile, userId) {
               ? `<button type="button" class="secondary visit-status-button" data-visit-id="${escapeHtml(visit.id)}" data-next-status="em_atendimento">Iniciar atendimento</button>`
               : visit.status === 'em_atendimento'
                 ? `<button type="button" class="secondary visit-status-button" data-visit-id="${escapeHtml(visit.id)}" data-next-status="atendido">Concluir atendimento</button>`
-                : '')}
+                : '')}`
           : profile.role === 'recepcao'
             ? `<details class="reception-action-menu"><summary>Selecione</summary><div class="reception-action-options">
                 ${sheetButton}${editButton}
