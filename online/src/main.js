@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import './style.css';
 import logoFavmed from '../../logo-favmed.png';
+import callSignalUrl from '../../chamador.mp3';
 
 const root = document.querySelector('#app');
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim();
@@ -269,6 +270,14 @@ async function renderOperationalModules(profile, userId) {
               <div class="field"><label for="other-exams">OUTROS EXAMES (OPCIONAL)</label><textarea id="other-exams" name="other_exam_names" rows="3" placeholder="Digite outros exames, um por linha"></textarea></div>
             </div>
           </details>
+          <details class="form-module">
+            <summary>Editar Paciente</summary>
+            <div class="module-content">
+              <div class="field"><label for="edit-patient-select">SELECIONE O PACIENTE</label><select id="edit-patient-select"><option value="">Selecione um paciente da fila</option></select></div>
+              <button class="secondary edit-patient-button" id="edit-patient-open" type="button" disabled>Editar paciente selecionado</button>
+              <p class="sub">Edite os dados e adicione exames sem remover os já cadastrados.</p>
+            </div>
+          </details>
           <div class="module-content reception-flags">
             <label class="service-option"><input type="checkbox" name="priority" value="true"> Prioridade no atendimento</label>
             <label class="service-option"><input type="checkbox" name="aso_pending" value="true"> ASO pendente</label>
@@ -280,17 +289,21 @@ async function renderOperationalModules(profile, userId) {
 
     ${profile.role === 'recepcao' ? `
       <section class="module-card">
-        <h3>Editar salas</h3>
-        <p class="muted">Cadastre e organize as salas utilizadas pela recepção e pelos profissionais. O painel de chamadas funciona sem login.</p>
-        <form id="room-setup-form" class="operational-form">
-          <div class="form-grid">
-            <div><label for="room-name">Nome da sala *</label><input id="room-name" name="name" required maxlength="80" placeholder="Ex.: Audiometria"></div>
-            <div><label for="room-type">Tipo</label><select id="room-type" name="room_type"><option value="exame">Exame</option><option value="consulta">Consulta</option><option value="recepcao">Recepção</option><option value="espera">Espera</option><option value="outro">Outro</option></select></div>
+        <details class="form-module">
+          <summary>Incluir / Editar Sala</summary>
+          <div class="module-content">
+            <p class="muted">Cadastre e organize as salas utilizadas pela recepção e pelos profissionais.</p>
+            <form id="room-setup-form" class="operational-form">
+              <div class="form-grid">
+                <div><label for="room-name">Nome da sala *</label><input id="room-name" name="name" required maxlength="80" placeholder="Ex.: Audiometria"></div>
+                <div><label for="room-type">Tipo</label><select id="room-type" name="room_type"><option value="exame">Exame</option><option value="consulta">Consulta</option><option value="recepcao">Recepção</option><option value="espera">Espera</option><option value="outro">Outro</option></select></div>
+              </div>
+              <button class="submit" id="room-create-submit" type="submit">Salvar sala</button>
+              <p id="room-setup-message" class="message" role="status"></p>
+            </form>
+            <div class="table-wrap"><table class="users-table"><thead><tr><th>Sala</th><th>Tipo</th><th>Status</th><th>Ação</th></tr></thead><tbody id="room-list-rows"><tr><td colspan="4">Carregando salas…</td></tr></table></div>
           </div>
-          <button class="submit" id="room-create-submit" type="submit">Salvar sala</button>
-          <p id="room-setup-message" class="message" role="status"></p>
-        </form>
-        <div class="table-wrap"><table class="users-table"><thead><tr><th>Sala</th><th>Tipo</th><th>Status</th><th>Ação</th></tr></thead><tbody id="room-list-rows"><tr><td colspan="4">Carregando salas…</td></tr></tbody></table></div>
+        </details>
       </section>` : ''}
     <section class="module-card">
       <div class="users-heading"><h3>${profile.role === 'sala' ? 'Exames desta sala' : profile.role === 'profissional' ? 'Painel do profissional' : 'Pacientes na fila'}</h3><span class="muted" id="operational-count"></span></div>
@@ -300,10 +313,9 @@ async function renderOperationalModules(profile, userId) {
         <button class="secondary" id="export-operational-csv" type="button">Exportar CSV</button>
         ${profile.role === 'recepcao' ? '<button class="secondary" id="backup-operational-json" type="button">Backup JSON</button>' : ''}
       </div>
-      <div class="table-wrap"><table class="users-table operational-table">
-        <thead><tr><th>Paciente</th><th>Salas</th><th>Status</th><th>Ação</th></tr></thead>
-        <tbody id="operational-rows"><tr><td colspan="4">Carregando dados…</td></tr></tbody>
-      </table></div>
+      \${profile.role === 'profissional'
+        ? '<div id="operational-rows" class="professional-cards"><div class="empty">Carregando fila compartilhada…</div></div>'
+        : '<div class="table-wrap"><table class="users-table operational-table"><thead><tr><th>Paciente</th><th>Salas</th><th>Status</th><th>Ação</th></tr></thead><tbody id="operational-rows"><tr><td colspan="4">Carregando dados…</td></tr></table></div>'}
       <p id="operational-message" class="message" role="status"></p>
     </section>`;
 
@@ -311,6 +323,7 @@ async function renderOperationalModules(profile, userId) {
   const roomSelect = document.querySelector('#visit-room');
   const professionalRoomFilter = document.querySelector('#professional-room-filter');
   let lastPatientsById = new Map();
+  let lastVisitsById = new Map();
     if (profile.role === 'recepcao') {
     const { data: savedRooms, error: savedRoomsError } = await supabase.from('rooms')
       .select('id, name, room_type, active').order('display_order').order('name');
