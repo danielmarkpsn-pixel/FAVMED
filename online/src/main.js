@@ -365,7 +365,7 @@ async function renderOperationalModules(profile, userId) {
       .eq('visit_date', todayLocal())
       .order('checked_in_at', { ascending: false }).limit(100);
     let assignedRoomId = '';
-    if (profile.role === 'profissional') visitsQuery = visitsQuery.eq('professional_id', userId);
+    // Todos os profissionais compartilham a fila do dia; o filtro por sala é aplicado na renderização.
     if (profile.role === 'sala') {
       const { data: assignedRoom, error: assignedRoomError } = await supabase.from('rooms')
         .select('id').eq('assigned_profile_id', userId).eq('active', true).maybeSingle();
