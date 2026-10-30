@@ -825,6 +825,7 @@ async function renderOperationalModules(profile, userId) {
       }
     } catch (error) {
       operationalMessage('#operational-message', error.message || 'Não foi possível atualizar o status.', true);
+      if (workflowButton) workflowButton.disabled = false;
       if (examButton) examButton.disabled = false;
       if (receptionCallButton) receptionCallButton.disabled = false;
       if (visitButton) visitButton.disabled = false;
@@ -836,6 +837,10 @@ async function renderOperationalModules(profile, userId) {
       if (cancelExamCallButton) cancelExamCallButton.disabled = false;
     }
   });
+  if (window.favmedOperationalRefresh) window.clearInterval(window.favmedOperationalRefresh);
+  window.favmedOperationalRefresh = window.setInterval(() => {
+    if (document.visibilityState === 'visible') loadOperationalRows();
+  }, 5000);
   await loadOperationalRows();
 }
 
