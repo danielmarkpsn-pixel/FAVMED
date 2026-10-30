@@ -254,7 +254,9 @@ async function renderOperationalModules(profile, userId) {
           <details class="form-module">
             <summary>Tipo de Exame / Atendimento</summary>
             <div class="module-content">
-              <div class="field"><label for="visit-type">TIPO DE EXAME / ATENDIMENTO *</label><select id="visit-type" name="attendance_type" required><option value="Admissional">Admissional</option><option value="Demissional">Demissional</option><option value="Periódico">Periódico</option><option value="Retorno">Retorno</option><option value="Mudança de riscos">Mudança de riscos</option><option value="Particular">Particular</option><option value="Pontual">Pontual</option><option value="Consulta Ocupacional">Consulta Ocupacional</option><option value="Concurso">Concurso</option><option value="Agendado">Agendado</option></select></div>
+              <div class="field"><label>TIPO DE EXAME / ATENDIMENTO * (MARQUE TODOS)</label><div class="service-options">
+                ${['Admissional','Demissional','Periódico','Retorno','Mudança de riscos','Particular','Pontual','Consulta Ocupacional','Concurso','Agendado'].map((type) => `<label class="service-option"><input type="checkbox" name="attendance_types" value="${escapeHtml(type)}"> ${escapeHtml(type)}</label>`).join('')}
+              </div></div>
               <div class="field"><label for="visit-room">SALA</label><select id="visit-room" name="room_ids" multiple size="5" aria-describedby="visit-room-help"></select><p class="sub" id="visit-room-help">Selecione uma ou várias salas. Use Ctrl (Windows) ou Command (Mac) para marcar mais de uma.</p></div>
             </div>
           </details>
@@ -502,6 +504,9 @@ async function renderOperationalModules(profile, userId) {
       const formData = new FormData(form);
       const values = Object.fromEntries(formData.entries());
       const selectedRoomIds = formData.getAll('room_ids').filter(Boolean);
+      const attendanceTypes = formData.getAll('attendance_types').filter(Boolean);
+      if (!attendanceTypes.length) { operationalMessage('#checkin-message', 'Selecione pelo menos um tipo de exame/atendimento.', true); return; }
+      if (!selectedRoomIds.length) { operationalMessage('#checkin-message', 'Selecione pelo menos uma sala.', true); return; }
       const cpf = String(values.cpf || '').replace(/\D/g, '');
       const documentFile = form.querySelector('#patient-pdf')?.files?.[0] || null;
       if (documentFile && (documentFile.size > 10 * 1024 * 1024 || (documentFile.type && documentFile.type !== 'application/pdf') || !documentFile.name.toLowerCase().endsWith('.pdf'))) {
@@ -553,9 +558,9 @@ async function renderOperationalModules(profile, userId) {
             job_title: String(values.job_title || '').trim() || null,
           },
           p_visit: {
-            attendance_type: values.attendance_type || 'Pontual',
+            attendance_type: attendanceTypes[0] || 'Pontual',
             professional_id: values.professional_id || null,
-            exam_types: values.attendance_type ? [values.attendance_type] : [],
+            exam_types: attendanceTypes,
             initial_room_ids: selectedRoomIds,
             room_id: selectedRoomIds[0] || null,
             company_name: String(values.company_name || '').trim() || null,
