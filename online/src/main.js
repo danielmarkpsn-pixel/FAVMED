@@ -490,41 +490,64 @@ async function renderOperationalModules(profile, userId) {
       button.textContent = 'Salvando cadastro…';
       operationalMessage('#checkin-message', '');
       try {
-        const { data: patient, error: patientError } = await supabase.from('patients').insert({
-          full_name: String(values.full_name || '').trim(),
-          cpf: cpf || null,
-          birth_date: values.birth_date || null,
-          company_name: String(values.company_name || '').trim() || null,
-          insurance: String(values.insurance || '').trim() || null,
-          job_title: String(values.job_title || '').trim() || null,
-          created_by: userId,
-        }).select('id').single();
-        if (patientError) throw patientError;
-        const { data: visit, error: visitError } = await supabase.from('patient_visits').insert({
-          patient_id: patient.id,
-          attendance_type: values.attendance_type,
-          room_id: selectedRoomIds[0] || null,
-          initial_room_ids: selectedRoomIds,
-          company_name: String(values.company_name || '').trim() || null,
-          priority: values.priority === 'true',
-          aso_pending: values.aso_pending === 'true',
-          aso_completed: false,
-          created_by: userId,
-        }).select('id').single();
-        if (visitError) throw new Error(`Paciente salvo, mas não foi possível abrir o atendimento: ${visitError.message}`);
-        if (examNames.length) {
-          const roomIdByName = new Map((roomResult.data || []).map((room) => [room.name, room.id]));
-          const examRows = examNames.map((exam, index) => ({
-            visit_id: visit.id, exam_name: exam.name, room_id: roomIdByName.get(exam.roomName) || selectedRoomIds[0] || null, display_order: index,
-          }));
-          const { error: examError } = await supabase.from('visit_exams').insert(examRows);
-          if (examError) throw new Error(`Atendimento criado, mas não foi possível salvar os exames: ${examError.message}`);
-        }
+        const roomById = new Map((roomResult.data || []).map((room) => [room.id, room]));
+        const serviceByRoomName = new Map([
+          ['Sala 1', 'RX'],
+          ['Sala 2', 'Coleta / laboratório'],
+          ['Sala 3', 'Audiometria'],
+          ['Sala 4', 'Exames complementares'],
+        ]);
+        const workflowRows = selectedRoomIds.map((roomId, index) => {
+          const room = roomById.get(roomId);
+          if (!room) throw new Error('Uma das salas selecionadas não está disponível. Atualize a página.');
+          const service = serviceByRoomName.get(room.name) || room.name;
+          return {
+            service_key: service,
+            room_id: roomId,
+            service_label: service,
+            status: 'aguardando',
+            call_label: room.name,
+            display_order: index,
+          };
+        });
+        const roomIdByName = new Map((roomResult.data || []).map((room) => [room.name, room.id]));
+        const examRows = examNames.map((exam, index) => ({
+          exam_name: exam.name,
+          room_id: roomIdByName.get(exam.roomName) || selectedRoomIds[0] || null,
+          display_order: index,
+        }));
+        const { data: visitId, error: checkinError } = await supabase.rpc('create_local_compatible_visit', {
+          p_patient: {
+            full_name: String(values.full_name || '').trim(),
+            cpf: cpf || null,
+            birth_date: values.birth_date || null,
+            company_name: String(values.company_name || '').trim() || null,
+            insurance: String(values.insurance || '').trim() || null,
+            job_title: String(values.job_title || '').trim() || null,
+          },
+          p_visit: {
+            attendance_type: values.attendance_type || 'Pontual',
+            exam_types: values.attendance_type ? [values.attendance_type] : [],
+            initial_room_ids: selectedRoomIds,
+            room_id: selectedRoomIds[0] || null,
+            company_name: String(values.company_name || '').trim() || null,
+            priority: values.priority === 'true',
+            aso_pending: values.aso_pending === 'true',
+            aso_completed: false,
+          },
+          p_workflows: workflowRows,
+          p_exams: examRows,
+        });
+        if (checkinError) throw checkinError;
+        const { data: visitRecord, error: visitLookupError } = await supabase
+          .from('patient_visits').select('patient_id').eq('id', visitId).single();
+        if (visitLookupError) throw visitLookupError;
+        const patientId = visitRecord.patient_id;
         if (documentFile) {
-          const documentPath = `${patient.id}/${crypto.randomUUID()}.pdf`;
+          const documentPath = `${patientId}/${crypto.randomUUID()}.pdf`;
           const { error: uploadError } = await supabase.storage.from('patient-documents').upload(documentPath, documentFile, { contentType: 'application/pdf', upsert: false });
           if (uploadError) throw new Error(`Atendimento criado, mas o PDF não foi anexado: ${uploadError.message}`);
-          const { error: documentUpdateError } = await supabase.from('patients').update({ document_path: documentPath }).eq('id', patient.id);
+          const { error: documentUpdateError } = await supabase.from('patients').update({ document_path: documentPath }).eq('id', patientId);
           if (documentUpdateError) throw new Error(`PDF enviado, mas não foi possível vincular o documento à ficha: ${documentUpdateError.message}`);
         }
         form.reset();
