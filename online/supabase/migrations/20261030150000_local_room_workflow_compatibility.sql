@@ -320,9 +320,11 @@ begin
   if jsonb_typeof(p_patient) <> 'object'
      or jsonb_typeof(p_visit) <> 'object'
      or jsonb_typeof(p_workflows) <> 'array'
-     or jsonb_array_length(p_workflows) = 0
      or jsonb_typeof(coalesce(p_exams, '[]'::jsonb)) <> 'array' then
     raise exception 'Dados de cadastro inválidos.';
+  end if;
+  if jsonb_array_length(p_workflows) = 0 then
+    raise exception 'Selecione pelo menos uma sala para o atendimento.';
   end if;
 
   select count(*) into v_room_count
