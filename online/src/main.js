@@ -512,7 +512,7 @@ async function renderOperationalModules(profile, userId) {
       if (documentFile && (documentFile.size > 10 * 1024 * 1024 || (documentFile.type && documentFile.type !== 'application/pdf') || !documentFile.name.toLowerCase().endsWith('.pdf'))) {
         operationalMessage('#checkin-message', 'O documento deve ser um PDF de até 10 MB.', true); return;
       }
-      if (cpf && !/^\d{11}$/.test(cpf)) {
+      if (!/^\d{11}$/.test(cpf)) {
         operationalMessage('#checkin-message', 'O CPF deve conter exatamente 11 números.', true);
         return;
       }
