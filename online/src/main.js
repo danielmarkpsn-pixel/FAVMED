@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import './style.css';
 import logoFavmed from '../../logo-favmed.png';
+import callSignalUrl from '../../chamador.mp3';
 
 const root = document.querySelector('#app');
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim();
@@ -269,6 +270,14 @@ async function renderOperationalModules(profile, userId) {
               <div class="field"><label for="other-exams">OUTROS EXAMES (OPCIONAL)</label><textarea id="other-exams" name="other_exam_names" rows="3" placeholder="Digite outros exames, um por linha"></textarea></div>
             </div>
           </details>
+          <details class="form-module">
+            <summary>Editar Paciente</summary>
+            <div class="module-content">
+              <div class="field"><label for="edit-patient-select">SELECIONE O PACIENTE</label><select id="edit-patient-select"><option value="">Selecione um paciente da fila</option></select></div>
+              <button class="secondary edit-patient-button" id="edit-patient-open" type="button" disabled>Editar paciente selecionado</button>
+              <p class="sub">Edite os dados e adicione exames sem remover os já cadastrados.</p>
+            </div>
+          </details>
           <div class="module-content reception-flags">
             <label class="service-option"><input type="checkbox" name="priority" value="true"> Prioridade no atendimento</label>
             <label class="service-option"><input type="checkbox" name="aso_pending" value="true"> ASO pendente</label>
@@ -280,17 +289,21 @@ async function renderOperationalModules(profile, userId) {
 
     ${profile.role === 'recepcao' ? `
       <section class="module-card">
-        <h3>Editar salas</h3>
-        <p class="muted">Cadastre e organize as salas utilizadas pela recepção e pelos profissionais. O painel de chamadas funciona sem login.</p>
-        <form id="room-setup-form" class="operational-form">
-          <div class="form-grid">
-            <div><label for="room-name">Nome da sala *</label><input id="room-name" name="name" required maxlength="80" placeholder="Ex.: Audiometria"></div>
-            <div><label for="room-type">Tipo</label><select id="room-type" name="room_type"><option value="exame">Exame</option><option value="consulta">Consulta</option><option value="recepcao">Recepção</option><option value="espera">Espera</option><option value="outro">Outro</option></select></div>
+        <details class="form-module">
+          <summary>Incluir / Editar Sala</summary>
+          <div class="module-content">
+            <p class="muted">Cadastre e organize as salas utilizadas pela recepção e pelos profissionais.</p>
+            <form id="room-setup-form" class="operational-form">
+              <div class="form-grid">
+                <div><label for="room-name">Nome da sala *</label><input id="room-name" name="name" required maxlength="80" placeholder="Ex.: Audiometria"></div>
+                <div><label for="room-type">Tipo</label><select id="room-type" name="room_type"><option value="exame">Exame</option><option value="consulta">Consulta</option><option value="recepcao">Recepção</option><option value="espera">Espera</option><option value="outro">Outro</option></select></div>
+              </div>
+              <button class="submit" id="room-create-submit" type="submit">Salvar sala</button>
+              <p id="room-setup-message" class="message" role="status"></p>
+            </form>
+            <div class="table-wrap"><table class="users-table"><thead><tr><th>Sala</th><th>Tipo</th><th>Status</th><th>Ação</th></tr></thead><tbody id="room-list-rows"><tr><td colspan="4">Carregando salas…</td></tr></table></div>
           </div>
-          <button class="submit" id="room-create-submit" type="submit">Salvar sala</button>
-          <p id="room-setup-message" class="message" role="status"></p>
-        </form>
-        <div class="table-wrap"><table class="users-table"><thead><tr><th>Sala</th><th>Tipo</th><th>Status</th><th>Ação</th></tr></thead><tbody id="room-list-rows"><tr><td colspan="4">Carregando salas…</td></tr></tbody></table></div>
+        </details>
       </section>` : ''}
     <section class="module-card">
       <div class="users-heading"><h3>${profile.role === 'sala' ? 'Exames desta sala' : profile.role === 'profissional' ? 'Painel do profissional' : 'Pacientes na fila'}</h3><span class="muted" id="operational-count"></span></div>
@@ -300,17 +313,28 @@ async function renderOperationalModules(profile, userId) {
         <button class="secondary" id="export-operational-csv" type="button">Exportar CSV</button>
         ${profile.role === 'recepcao' ? '<button class="secondary" id="backup-operational-json" type="button">Backup JSON</button>' : ''}
       </div>
-      <div class="table-wrap"><table class="users-table operational-table">
-        <thead><tr><th>Paciente</th><th>Salas</th><th>Status</th><th>Ação</th></tr></thead>
-        <tbody id="operational-rows"><tr><td colspan="4">Carregando dados…</td></tr></tbody>
-      </table></div>
+      \${profile.role === 'profissional'
+        ? '<div id="operational-rows" class="professional-cards"><div class="empty">Carregando fila compartilhada…</div></div>'
+        : '<div class="table-wrap"><table class="users-table operational-table"><thead><tr><th>Paciente</th><th>Salas</th><th>Status</th><th>Ação</th></tr></thead><tbody id="operational-rows"><tr><td colspan="4">Carregando dados…</td></tr></table></div>'}
       <p id="operational-message" class="message" role="status"></p>
     </section>`;
 
+  const editPatientSelect = document.querySelector('#edit-patient-select');
+  const editPatientOpen = document.querySelector('#edit-patient-open');
+  editPatientSelect?.addEventListener('change', () => {
+    const visit = lastVisitsById.get(editPatientSelect.value);
+    const patient = visit && lastPatientsById.get(visit.patient_id);
+    if (editPatientOpen) {
+      editPatientOpen.disabled = !patient;
+      editPatientOpen.dataset.patientId = patient?.id || '';
+      editPatientOpen.dataset.visitId = visit?.id || '';
+    }
+  });
   const professionalSelect = document.querySelector('#visit-professional');
   const roomSelect = document.querySelector('#visit-room');
   const professionalRoomFilter = document.querySelector('#professional-room-filter');
   let lastPatientsById = new Map();
+  let lastVisitsById = new Map();
     if (profile.role === 'recepcao') {
     const { data: savedRooms, error: savedRoomsError } = await supabase.from('rooms')
       .select('id, name, room_type, active').order('display_order').order('name');
@@ -388,12 +412,13 @@ async function renderOperationalModules(profile, userId) {
       if (visitIds.length) {
         const { data, error } = await supabase.from('patient_visits')
           .select('id, patient_id, visit_date, attendance_type, status, checked_in_at')
-          .in('id', visitIds).eq('visit_date', todayLocal()).order('checked_in_at', { ascending: false });
+          .in('id', visitIds).eq('visit_date', todayLocal()).neq('status', 'cancelado').order('checked_in_at', { ascending: false });
         if (error) { rows.innerHTML = '<tr><td colspan="4">Não foi possível carregar a fila desta sala.</td></tr>'; return; }
         visits = data || [];
       }
       return renderRows(visits, exams || [], true);
     }
+    visitsQuery = visitsQuery.neq('status', 'cancelado');
     const { data: visits, error } = await visitsQuery;
     if (error) {
       rows.innerHTML = '<tr><td colspan="4">Não foi possível carregar a fila. Verifique se a migração operacional foi aplicada e se as políticas RLS estão ativas.</td></tr>';
@@ -417,6 +442,7 @@ async function renderOperationalModules(profile, userId) {
     const count = document.querySelector('#operational-count');
     if (!rows) return;
     lastPatientsById = new Map(patients.map((patient) => [patient.id, patient]));
+    lastVisitsById = new Map(visits.map((visit) => [visit.id, visit]));
     const term = document.querySelector('#operational-search')?.value.trim().toLocaleLowerCase('pt-BR') || '';
     const selectedRoomId = document.querySelector('#professional-room-filter')?.value || '';
     visits = visits.filter((visit) => {
@@ -427,11 +453,54 @@ async function renderOperationalModules(profile, userId) {
       return matchesRoom && (!term || searchable.includes(term));
     }).sort((a, b) => Number(Boolean(b.priority)) - Number(Boolean(a.priority)) || new Date(a.checked_in_at || 0) - new Date(b.checked_in_at || 0));
     count.textContent = `${visits.length} atendimento(s)`;
+    const patientMap = new Map(patients.map((patient) => [patient.id, patient]));
+    if (profile.role === 'recepcao') {
+      const editSelect = document.querySelector('#edit-patient-select');
+      const editButton = document.querySelector('#edit-patient-open');
+      if (editSelect) {
+        const previous = editSelect.value;
+        editSelect.innerHTML = '<option value="">Selecione um paciente da fila</option>' + visits.filter((visit) => patientMap.has(visit.patient_id)).map((visit) => '<option value="' + escapeHtml(visit.id) + '">' + escapeHtml(patientMap.get(visit.patient_id).full_name || 'Paciente') + ' · ' + escapeHtml(visit.attendance_type || 'Atendimento') + '</option>').join('');
+        if (previous && [...editSelect.options].some((option) => option.value === previous)) editSelect.value = previous;
+        const selectedVisit = lastVisitsById.get(editSelect.value);
+        const selectedPatient = selectedVisit && patientMap.get(selectedVisit.patient_id);
+        if (editButton) {
+          editButton.disabled = !selectedPatient;
+          editButton.dataset.patientId = selectedPatient?.id || '';
+          editButton.dataset.visitId = selectedVisit?.id || '';
+        }
+      }
+    }
     if (!visits.length) {
-      rows.innerHTML = '<tr><td colspan="4">Nenhum atendimento encontrado.</td></tr>';
+      rows.innerHTML = profile.role === 'profissional' ? '<div class="empty">Nenhum atendimento encontrado para hoje.</div>' : '<tr><td colspan="4">Nenhum atendimento encontrado.</td></tr>';
       return;
     }
-    const patientMap = new Map(patients.map((patient) => [patient.id, patient]));
+    if (profile.role === 'profissional') {
+      const cards = visits.flatMap((visit) => {
+        const patient = patientMap.get(visit.patient_id);
+        const visitExams = exams.filter((exam) => exam.visit_id === visit.id);
+        const getRoomName = (roomId) => (roomResult.data || []).find((room) => room.id === roomId)?.name || 'Sala não definida';
+        const name = escapeHtml(patient?.full_name || 'Paciente não identificado');
+        const ficha = patient ? '<button type="button" class="secondary patient-sheet-button" data-patient-id="' + escapeHtml(patient.id) + '" data-visit-id="' + escapeHtml(visit.id) + '">Visualizar Ficha</button>' : '';
+        const priority = visit.priority ? '<span class="priority-flag">PRIORIDADE</span>' : '';
+        const makeCard = (exam, status, roomName, actions) => '<article class="professional-card ' + (status === 'chamado' ? 'blinking' : status === 'em_atendimento' ? 'attending' : status === 'atendido' || status === 'realizado' ? 'completed' : '') + '"><div class="professional-card-head"><div><strong>' + name + priority + '</strong><p>' + escapeHtml(visit.attendance_type || 'Atendimento') + '</p></div>' + ficha + '</div><div class="professional-card-meta">' + (exam ? '<strong>' + escapeHtml(exam.exam_name) + '</strong>' : '') + '<span>' + escapeHtml(roomName) + '</span><span class="status-pill">' + escapeHtml(operationalStatuses[status] || status) + '</span></div><div class="professional-card-actions">' + actions + '</div></article>';
+        if (!visitExams.length) {
+          const status = visit.status || 'aguardando';
+          const actions = status === 'aguardando' ? '<button type="button" class="secondary visit-status-button" data-visit-id="' + escapeHtml(visit.id) + '" data-next-status="chamado">🔊 Chamar paciente</button>'
+            : status === 'chamado' ? '<button type="button" class="secondary visit-status-button" data-visit-id="' + escapeHtml(visit.id) + '" data-next-status="em_atendimento">Iniciar atendimento</button><button type="button" class="secondary repeat-call-button" data-visit-id="' + escapeHtml(visit.id) + '">Repetir chamada</button><button type="button" class="secondary cancel-call-button" data-visit-id="' + escapeHtml(visit.id) + '">Cancelar chamada</button>'
+            : status === 'em_atendimento' ? '<button type="button" class="secondary visit-status-button" data-visit-id="' + escapeHtml(visit.id) + '" data-next-status="atendido">Concluir atendimento</button>' : '<span class="status-pill active">Atendimento realizado</span>';
+          return [makeCard(null, status, getRoomName(visit.room_id), actions)];
+        }
+        return visitExams.map((exam) => {
+          const status = exam.status || visit.status || 'pendente';
+          const actions = status === 'pendente' ? '<button type="button" class="secondary exam-status-button" data-exam-id="' + escapeHtml(exam.id) + '" data-next-status="chamado">🔊 Chamar paciente</button>'
+            : status === 'chamado' ? '<button type="button" class="secondary exam-status-button" data-exam-id="' + escapeHtml(exam.id) + '" data-next-status="em_atendimento">Iniciar atendimento</button><button type="button" class="secondary repeat-exam-call-button" data-exam-id="' + escapeHtml(exam.id) + '">Repetir chamada</button><button type="button" class="secondary cancel-exam-call-button" data-exam-id="' + escapeHtml(exam.id) + '">Cancelar chamada</button>'
+            : status === 'em_atendimento' ? '<button type="button" class="secondary exam-status-button" data-exam-id="' + escapeHtml(exam.id) + '" data-next-status="realizado">Concluir exame</button>' : '<span class="status-pill active">Exame realizado</span>';
+          return makeCard(exam, status, getRoomName(exam.room_id), actions);
+        });
+      }).join('');
+      rows.innerHTML = cards || '<div class="empty">Nenhum atendimento encontrado.</div>';
+      return;
+    }
     rows.innerHTML = visits.map((visit) => {
       const patient = patientMap.get(visit.patient_id);
       const visitExams = exams.filter((exam) => exam.visit_id === visit.id);
@@ -439,7 +508,7 @@ async function renderOperationalModules(profile, userId) {
         ? (visitExams.some((exam) => exam.status === 'em_atendimento') ? 'em_atendimento' : visitExams.some((exam) => exam.status === 'chamado') ? 'chamado' : visitExams.every((exam) => exam.status === 'realizado') ? 'atendido' : visit.status)
         : visit.status;
       const sheetButton = !roomMode && patient ? `<button type="button" class="secondary patient-sheet-button" data-patient-id="${escapeHtml(patient.id)}" data-visit-id="${escapeHtml(visit.id)}">Visualizar Ficha</button>` : '';
-      const editButton = profile.role === 'recepcao' && patient ? `<button type="button" class="secondary edit-patient-button" data-patient-id="${escapeHtml(patient.id)}" data-visit-id="${escapeHtml(visit.id)}">Editar / adicionar exames</button>` : '';
+      const editButton = '';
       const action = roomMode
         ? visitExams.map((exam) => `<button type="button" class="secondary exam-status-button" data-exam-id="${escapeHtml(exam.id)}" data-next-status="${exam.status === 'pendente' ? 'em_atendimento' : 'realizado'}">${escapeHtml(exam.exam_name)}: ${exam.status === 'pendente' ? 'Iniciar' : 'Marcar realizado'}</button>`).join(' ')
         : (profile.role === 'profissional'
@@ -457,13 +526,13 @@ async function renderOperationalModules(profile, userId) {
                 ? `<button type="button" class="secondary visit-status-button" data-visit-id="${escapeHtml(visit.id)}" data-next-status="atendido">Concluir atendimento</button>`
                 : '')}`
           : profile.role === 'recepcao'
-            ? `${sheetButton} ${editButton} ${['Recepção 1','Recepção 2','Recepção 3'].map((label) => { const station = (roomResult.data || []).find((room) => room.name.toLowerCase() === label.toLowerCase()); return station ? `<button type="button" class="secondary reception-call-button" data-visit-id="${escapeHtml(visit.id)}" data-room-id="${escapeHtml(station.id)}">Chamar na ${label}</button>` : ''; }).join(' ')} <button type="button" class="secondary priority-toggle-button" data-visit-id="${escapeHtml(visit.id)}" data-next-priority="${!visit.priority}">${visit.priority ? 'Retirar prioridade' : 'Marcar prioridade'}</button> <button type="button" class="secondary aso-toggle-button ${visit.aso_completed ? 'aso-completed' : visit.aso_pending ? 'aso-pending' : ''}" data-visit-id="${escapeHtml(visit.id)}" data-next-aso="${visit.aso_completed ? 'reset' : visit.aso_pending ? 'complete' : 'pending'}">${visit.aso_completed ? 'ASO REALIZADO ✓' : visit.aso_pending ? 'ASO PENDENTE · Marcar realizado' : 'Marcar ASO pendente'}</button>`
+            ? `${sheetButton} ${['Recepção 1','Recepção 2','Recepção 3'].map((label) => { const station = (roomResult.data || []).find((room) => room.name.toLowerCase() === label.toLowerCase()); return station ? `<button type="button" class="secondary reception-call-button" data-visit-id="${escapeHtml(visit.id)}" data-room-id="${escapeHtml(station.id)}">Chamar na ${label}</button>` : ''; }).join(' ')} <button type="button" class="secondary priority-toggle-button" data-visit-id="${escapeHtml(visit.id)}" data-next-priority="${!visit.priority}">${visit.priority ? 'Retirar prioridade' : 'Marcar prioridade'}</button> <button type="button" class="secondary aso-toggle-button ${visit.aso_completed ? 'aso-completed' : visit.aso_pending ? 'aso-pending' : ''}" data-visit-id="${escapeHtml(visit.id)}" data-next-aso="${visit.aso_completed ? 'reset' : visit.aso_pending ? 'complete' : 'pending'}">${visit.aso_completed ? 'ASO REALIZADO ✓' : visit.aso_pending ? 'ASO PENDENTE · Marcar realizado' : 'Marcar ASO pendente'}</button>`
             : '');
       const roomNames = [...new Set(visitExams.map((exam) => (roomResult.data || []).find((room) => room.id === exam.room_id)?.name).filter(Boolean).concat((visit.initial_room_ids || []).map((id) => (roomResult.data || []).find((room) => room.id === id)?.name).filter(Boolean)))];
       const roomLabels = roomNames.length ? roomNames.map((name) => `<span class="exam-pill">${escapeHtml(name)}</span>`).join(' ') : '<span class="muted">Sala não definida</span>';
       const patientLabel = roomMode ? `Atendimento #${escapeHtml(visit.id.slice(0, 8))}` : escapeHtml(patient?.full_name || 'Paciente não visível');
       const flags = profile.role === 'recepcao' ? `${visit.priority ? '<span class="priority-flag">PRIORIDADE</span>' : ''}${visit.aso_completed ? '<span class="aso-flag aso-completed">ASO REALIZADO</span>' : visit.aso_pending ? '<span class="aso-flag aso-pending">ASO PENDENTE</span>' : ''}` : '';
-      const receptionAction = profile.role === 'recepcao' ? `<details class="row-action-menu"><summary class="secondary">Selecione</summary><div class="row-action-options">${sheetButton} ${editButton} ${['Recepção 1','Recepção 2','Recepção 3'].map((label) => { const station = (roomResult.data || []).find((room) => room.name.toLowerCase() === label.toLowerCase()); return station ? `<button type="button" class="secondary reception-call-button" data-visit-id="${escapeHtml(visit.id)}" data-room-id="${escapeHtml(station.id)}">Chamar na ${label}</button>` : ''; }).join(' ')} <button type="button" class="secondary priority-toggle-button" data-visit-id="${escapeHtml(visit.id)}" data-next-priority="${!visit.priority}">${visit.priority ? 'Retirar prioridade' : 'Marcar prioridade'}</button> <button type="button" class="secondary aso-toggle-button ${visit.aso_completed ? 'aso-completed' : visit.aso_pending ? 'aso-pending' : ''}" data-visit-id="${escapeHtml(visit.id)}" data-next-aso="${visit.aso_completed ? 'reset' : visit.aso_pending ? 'complete' : 'pending'}">${visit.aso_completed ? 'ASO REALIZADO ✓' : visit.aso_pending ? 'ASO PENDENTE · Marcar realizado' : 'Marcar ASO pendente'}</button></div></details>` : action;
+      const receptionAction = profile.role === 'recepcao' ? `<details class="row-action-menu"><summary class="secondary">Selecione</summary><div class="row-action-options">${sheetButton} ${['Recepção 1','Recepção 2','Recepção 3'].map((label) => { const station = (roomResult.data || []).find((room) => room.name.toLowerCase() === label.toLowerCase()); return station ? `<button type="button" class="secondary reception-call-button" data-visit-id="${escapeHtml(visit.id)}" data-room-id="${escapeHtml(station.id)}">Chamar na ${label}</button>` : ''; }).join(' ')} <button type="button" class="secondary priority-toggle-button" data-visit-id="${escapeHtml(visit.id)}" data-next-priority="${!visit.priority}">${visit.priority ? 'Retirar prioridade' : 'Marcar prioridade'}</button> <button type="button" class="secondary aso-toggle-button ${visit.aso_completed ? 'aso-completed' : visit.aso_pending ? 'aso-pending' : ''}" data-visit-id="${escapeHtml(visit.id)}" data-next-aso="${visit.aso_completed ? 'reset' : visit.aso_pending ? 'complete' : 'pending'}">${visit.aso_completed ? 'ASO REALIZADO ✓' : visit.aso_pending ? 'ASO PENDENTE · Marcar realizado' : 'Marcar ASO pendente'}</button><button type="button" class="secondary delete-patient-button" data-visit-id="${escapeHtml(visit.id)}" data-patient-name="${escapeHtml(patient?.full_name || 'Paciente')}">Excluir paciente</button></div></details>` : action;
       return `<tr><td><strong>${patientLabel}</strong><div class="patient-row-flags">${flags}</div></td><td>${roomLabels}</td><td><span class="status-pill ${status === 'atendido' ? 'active' : status === 'cancelado' ? 'inactive' : ''}">${escapeHtml(operationalStatuses[status] || status)}</span></td><td>${receptionAction || '<span class="muted">—</span>'}</td></tr>`;
     }).join('');
   }
@@ -571,7 +640,24 @@ async function renderOperationalModules(profile, userId) {
     } catch (error) { operationalMessage('#operational-message', error.message || 'Não foi possível gerar o backup.', true); }
     finally { button.disabled = false; button.textContent = 'Backup JSON'; }
   });
-  document.querySelector('#operational-rows').addEventListener('click', async (event) => {
+  panel.addEventListener('click', async (event) => {
+    const menuSummary = event.target.closest('.row-action-menu > summary');
+    if (menuSummary) {
+      const currentMenu = menuSummary.parentElement;
+      requestAnimationFrame(() => {
+        if (!currentMenu.open) return;
+        document.querySelectorAll('.row-action-menu[open]').forEach((menu) => { if (menu !== currentMenu) menu.open = false; });
+        const rect = menuSummary.getBoundingClientRect();
+        const popup = currentMenu.querySelector('.row-action-options');
+        const width = Math.min(300, window.innerWidth - 24);
+        const height = Math.min(320, window.innerHeight - 24);
+        const left = Math.max(12, Math.min(rect.left, window.innerWidth - width - 12));
+        const below = rect.bottom + 6;
+        const top = below + height <= window.innerHeight - 12 ? below : Math.max(12, rect.top - height - 6);
+        popup.style.left = left + 'px';
+        popup.style.top = top + 'px';
+      });
+    }
     const examButton = event.target.closest('.exam-status-button');
     const visitButton = event.target.closest('.visit-status-button');
     const receptionCallButton = event.target.closest('.reception-call-button');
@@ -579,10 +665,26 @@ async function renderOperationalModules(profile, userId) {
     const asoButton = event.target.closest('.aso-toggle-button');
     const sheetButton = event.target.closest('.patient-sheet-button');
     const editPatientButton = event.target.closest('.edit-patient-button');
+    const deletePatientButton = event.target.closest('.delete-patient-button');
     const repeatCallButton = event.target.closest('.repeat-call-button');
     const cancelCallButton = event.target.closest('.cancel-call-button');
     const repeatExamCallButton = event.target.closest('.repeat-exam-call-button');
     const cancelExamCallButton = event.target.closest('.cancel-exam-call-button');
+    if (deletePatientButton) {
+      const visitId = deletePatientButton.dataset.visitId;
+      const patientName = deletePatientButton.dataset.patientName || 'este paciente';
+      if (!window.confirm('Remover ' + patientName + ' da fila de hoje? O cadastro e o histórico clínico serão preservados.')) return;
+      deletePatientButton.disabled = true;
+      const { error } = await supabase.from('patient_visits').update({ status: 'cancelado', updated_at: new Date().toISOString() }).eq('id', visitId);
+      if (error) {
+        operationalMessage('#operational-message', error.message || 'Não foi possível remover o paciente da fila.', true);
+        deletePatientButton.disabled = false;
+        return;
+      }
+      operationalMessage('#operational-message', 'Paciente removido da fila. Cadastro e histórico foram preservados.');
+      await loadOperationalRows();
+      return;
+    }
     if (sheetButton) {
       const patient = lastPatientsById.get(sheetButton.dataset.patientId);
       if (!patient) return;
@@ -897,42 +999,74 @@ function renderHome(profile, userId) {
 }
 
 async function renderPublicWaitingRoom() {
-  root.innerHTML = `
-    <main class="waiting-screen">
-      <header class="waiting-brand"><img class="brand-logo" src="${logoFavmed}" alt="Clínica Favmed"/><div><h1>Clínica Favmed</h1><p>PAINEL DE CHAMADAS</p></div><button class="secondary audio-enable" id="enable-call-audio" type="button">Ativar voz</button><span class="public-live"><i></i> AO VIVO</span></header>
-      <section class="waiting-content"><p class="eyebrow">ATENÇÃO</p><h2>Paciente chamado</h2><div id="public-calls" class="public-calls"><p class="muted">Carregando chamadas…</p></div><p class="waiting-note">Aguarde a chamada da recepção ou do profissional.</p></section>
-    </main>`;
+  root.innerHTML = '<main class="waiting-screen favmed-room-screen">' +
+    '<header class="waiting-brand"><img class="brand-logo" src="' + escapeHtml(logoFavmed) + '" alt="Clínica Favmed"/><div><h1>Clínica Favmed</h1><p>PAINEL DE CHAMADAS</p></div><button class="secondary audio-enable" id="enable-call-audio" type="button">Ativar som</button><span class="public-live"><i></i> AO VIVO</span></header>' +
+    '<section class="waiting-content"><p class="eyebrow">ATENÇÃO</p><h2>Chamadas da clínica</h2><div id="public-calls" class="room-call-grid" aria-live="polite"><div class="no-calls"><strong>Aguardando próxima chamada</strong>Por favor, aguarde.</div></div><p id="room-audio-status" class="waiting-note">Ative o som uma vez para liberar o áudio de chamadas neste navegador.</p></section>' +
+    '<audio id="room-call-signal" src="' + escapeHtml(callSignalUrl) + '" preload="auto" playsinline></audio></main>';
   const calls = document.querySelector('#public-calls');
   const audioButton = document.querySelector('#enable-call-audio');
+  const audio = document.querySelector('#room-call-signal');
+  const audioStatus = document.querySelector('#room-audio-status');
   let audioEnabled = false;
-  let lastSpokenCall = '';
-  audioButton.addEventListener('click', async () => {
-    audioEnabled = true;
-    audioButton.textContent = 'Voz ativada';
-    audioButton.disabled = true;
-    await refreshCalls();
-  });
+  let firstSnapshot = true;
+  const seenCallKeys = new Set();
+
   async function refreshCalls() {
-    const { data, error } = await supabase.from('public_waiting_room_calls').select('display_name, room_name, called_at').order('called_at', { ascending: false }).limit(5);
-    if (error) { calls.innerHTML = '<p class="muted">Painel temporariamente indisponível. Solicite ajuda à recepção.</p>'; return; }
-    calls.innerHTML = data?.length ? data.map((call, index) => `<article class="call-card ${index === 0 ? 'current-call' : ''}"><div><span class="call-label">${index === 0 ? 'CHAMADA ATUAL' : 'CHAMADA RECENTE'}</span><h3>${escapeHtml(call.display_name)}</h3></div><div class="call-room"><span>DIRIJA-SE À</span><strong>${escapeHtml(call.room_name || 'Recepção')}</strong></div></article>`).join('') : '<div class="no-calls"><h3>Nenhuma chamada no momento</h3><p>Por favor, aguarde.</p></div>';
-    const current = data?.[0];
-    const callKey = current ? `${current.called_at}|${current.display_name}|${current.room_name}` : '';
-    if (audioEnabled && current && callKey !== lastSpokenCall && 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window) {
-      lastSpokenCall = callKey;
-      const utterance = new SpeechSynthesisUtterance(`Atenção. ${current.display_name}. Favor dirigir-se à ${current.room_name || 'recepção'}.`);
-      utterance.lang = 'pt-BR';
-      const voices = window.speechSynthesis.getVoices();
-      const portugueseVoice = voices.find((voice) => voice.lang?.toLowerCase().startsWith('pt-br')) || voices.find((voice) => voice.lang?.toLowerCase().startsWith('pt'));
-      if (portugueseVoice) utterance.voice = portugueseVoice;
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(utterance);
+    const { data, error } = await supabase.from('public_waiting_room_calls')
+      .select('display_name, room_name, called_at, call_status')
+      .order('called_at', { ascending: false }).limit(12);
+    if (error) {
+      calls.innerHTML = '<p class="room-error">Painel temporariamente indisponível. Solicite ajuda à recepção.</p>';
+      return;
+    }
+    const activeCalls = data || [];
+    calls.innerHTML = activeCalls.length ? activeCalls.map((call) => {
+      const attending = call.call_status === 'em_atendimento';
+      return '<article class="room-call-card ' + (attending ? 'attending' : 'blinking') + '">' +
+        '<div class="call-label">' + (attending ? 'EM ATENDIMENTO' : 'PACIENTE CHAMADO') + '</div>' +
+        '<div class="call-name">' + escapeHtml(call.display_name) + '</div>' +
+        '<div class="call-room">➜ ' + escapeHtml(call.room_name || 'Recepção') + '</div></article>';
+    }).join('') : '<div class="no-calls"><strong>Aguardando próxima chamada</strong>Por favor, aguarde.</div>';
+
+    for (const call of activeCalls) {
+      const key = String(call.called_at) + '|' + call.display_name + '|' + call.room_name;
+      if (!seenCallKeys.has(key)) {
+        if (audioEnabled && !firstSnapshot && call.call_status === 'chamado') {
+          audio.pause();
+          audio.currentTime = 0;
+          audio.volume = 0.82;
+          audio.play().then(() => { audioStatus.textContent = 'Som de chamada reproduzido. Aguardando próxima chamada.'; })
+            .catch(() => { audioStatus.textContent = 'O navegador bloqueou o som. Clique em “Ativar som” e tente novamente.'; });
+        }
+        seenCallKeys.add(key);
+      }
+    }
+    firstSnapshot = false;
+  }
+
+  async function unlockCallAudio() {
+    if (audioEnabled) return;
+    audio.muted = true;
+    try {
+      await audio.play();
+      audio.pause();
+      audio.currentTime = 0;
+      audio.muted = false;
+      audioEnabled = true;
+      audioButton.textContent = 'Som ativado';
+      audioStatus.textContent = 'Áudio habilitado. Aguardando chamadas da recepção e dos profissionais.';
+      await refreshCalls();
+    } catch {
+      audio.muted = false;
+      audioStatus.textContent = 'Não foi possível ativar o som. Verifique o volume do dispositivo e tente novamente.';
     }
   }
-  await refreshCalls();
-  window.setInterval(refreshCalls, 5000);
+  audioButton.addEventListener('click', unlockCallAudio);
+  document.addEventListener('pointerdown', unlockCallAudio, { once: true });
+  document.addEventListener('keydown', unlockCallAudio, { once: true });
+  refreshCalls();
+  window.setInterval(refreshCalls, 1500);
 }
-
 async function start() {
   if (!configured) return renderSetup();
   if (window.location.pathname.replace(/\/+$/, '') === '/sala') return renderPublicWaitingRoom();
