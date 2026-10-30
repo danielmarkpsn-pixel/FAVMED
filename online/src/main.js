@@ -300,7 +300,7 @@ async function renderOperationalModules(profile, userId) {
         ${profile.role === 'recepcao' ? '<button class="secondary" id="backup-operational-json" type="button">Backup JSON</button>' : ''}
       </div>
       <div class="table-wrap"><table class="users-table operational-table">
-        <thead><tr><th>Paciente / Atendimento</th><th>Exames</th><th>Status</th><th>Ação</th></tr></thead>
+        <thead><tr><th>Paciente</th><th>Salas</th><th>Status</th><th>Ação</th></tr></thead>
         <tbody id="operational-rows"><tr><td colspan="4">Carregando dados…</td></tr></tbody>
       </table></div>
       <p id="operational-message" class="message" role="status"></p>
@@ -361,7 +361,7 @@ async function renderOperationalModules(profile, userId) {
     if (!rows) return;
     rows.innerHTML = '<tr><td colspan="4">Carregando dados…</td></tr>';
     let visitsQuery = supabase.from('patient_visits')
-      .select('id, patient_id, visit_date, attendance_type, status, professional_id, room_id, checked_in_at, priority, aso_pending, aso_completed')
+      .select('id, patient_id, visit_date, attendance_type, status, professional_id, room_id, initial_room_ids, checked_in_at, priority, aso_pending, aso_completed')
       .eq('visit_date', todayLocal())
       .order('checked_in_at', { ascending: false }).limit(100);
     let assignedRoomId = '';
@@ -454,16 +454,22 @@ async function renderOperationalModules(profile, userId) {
               ? `<button type="button" class="secondary visit-status-button" data-visit-id="${escapeHtml(visit.id)}" data-next-status="em_atendimento">Iniciar atendimento</button>`
               : visit.status === 'em_atendimento'
                 ? `<button type="button" class="secondary visit-status-button" data-visit-id="${escapeHtml(visit.id)}" data-next-status="atendido">Concluir atendimento</button>`
-                : '')}`
+                : '')}
           : profile.role === 'recepcao'
-            ? `${sheetButton} ${editButton} ${['Recepção 1','Recepção 2','Recepção 3'].map((label) => { const station = (roomResult.data || []).find((room) => room.name.toLowerCase() === label.toLowerCase()); return station ? `<button type="button" class="secondary reception-call-button" data-visit-id="${escapeHtml(visit.id)}" data-room-id="${escapeHtml(station.id)}">Chamar na ${label}</button>` : ''; }).join(' ')} <button type="button" class="secondary priority-toggle-button" data-visit-id="${escapeHtml(visit.id)}" data-next-priority="${!visit.priority}">${visit.priority ? 'Retirar prioridade' : 'Marcar prioridade'}</button> <button type="button" class="secondary aso-toggle-button ${visit.aso_completed ? 'aso-completed' : visit.aso_pending ? 'aso-pending' : ''}" data-visit-id="${escapeHtml(visit.id)}" data-next-aso="${visit.aso_completed ? 'reset' : visit.aso_pending ? 'complete' : 'pending'}">${visit.aso_completed ? 'ASO REALIZADO ✓' : visit.aso_pending ? 'ASO PENDENTE · Marcar realizado' : 'Marcar ASO pendente'}</button>`
+            ? `<details class="reception-action-menu"><summary>Selecione</summary><div class="reception-action-options">
+                ${sheetButton}${editButton}
+                ${['Recepção 1','Recepção 2','Recepção 3'].map((label) => { const station = (roomResult.data || []).find((room) => room.name.toLowerCase() === label.toLowerCase()); return station ? `<button type="button" class="secondary reception-call-button" data-visit-id="${escapeHtml(visit.id)}" data-room-id="${escapeHtml(station.id)}">Chamar na ${label}</button>` : ''; }).join('')}
+                <button type="button" class="secondary priority-toggle-button" data-visit-id="${escapeHtml(visit.id)}" data-next-priority="${!visit.priority}">${visit.priority ? 'Retirar prioridade' : 'Marcar prioridade'}</button>
+                <button type="button" class="secondary aso-toggle-button ${visit.aso_completed ? 'aso-completed' : visit.aso_pending ? 'aso-pending' : ''}" data-visit-id="${escapeHtml(visit.id)}" data-next-aso="${visit.aso_completed ? 'reset' : visit.aso_pending ? 'complete' : 'pending'}">${visit.aso_completed ? 'ASO realizado · desfazer' : visit.aso_pending ? 'Marcar ASO realizado' : 'Marcar ASO pendente'}</button>
+              </div></details>`
             : '');
       const examLabels = visitExams.length ? visitExams.map((exam) => `<span class="exam-pill">${escapeHtml(exam.exam_name)} · ${escapeHtml(exam.status)}</span>`).join(' ') : '<span class="muted">Sem exames vinculados</span>';
       const patientLabel = roomMode ? `Atendimento #${escapeHtml(visit.id.slice(0, 8))}` : escapeHtml(patient?.full_name || 'Paciente não visível');
       const flags = profile.role === 'recepcao' ? `${visit.priority ? '<span class="priority-flag">PRIORIDADE</span>' : ''}${visit.aso_completed ? '<span class="aso-flag aso-completed">ASO REALIZADO</span>' : visit.aso_pending ? '<span class="aso-flag aso-pending">ASO PENDENTE</span>' : ''}` : '';
-      const company = patient?.company_name ? `<br><small>${escapeHtml(patient.company_name)}</small>` : '';
-      const extraPatient = patient?.insurance || patient?.job_title ? `<br><small>${escapeHtml([patient.insurance, patient.job_title].filter(Boolean).join(' · '))}</small>` : '';
-      return `<tr><td><strong>${patientLabel}</strong> ${flags}${company}${extraPatient}<br><small>${escapeHtml(visit.attendance_type)} · ${escapeHtml(visit.visit_date)}</small></td><td>${examLabels}</td><td><span class="status-pill ${status === 'atendido' ? 'active' : status === 'cancelado' ? 'inactive' : ''}">${escapeHtml(operationalStatuses[status] || status)}</span></td><td>${action || '<span class="muted">—</span>'}</td></tr>`;
+      const selectedRoomIds = [...new Set([...(Array.isArray(visit.initial_room_ids) ? visit.initial_room_ids : []), ...visitExams.map((exam) => exam.room_id).filter(Boolean), visit.room_id].filter(Boolean))];
+      const roomLabels = selectedRoomIds.map((id) => (roomResult.data || []).find((room) => room.id === id)?.name).filter((name) => name && !/^Recepção [123]$/i.test(name));
+      const roomDisplay = profile.role === 'recepcao' ? (roomLabels.length ? roomLabels.map((name) => `<span class="exam-pill">${escapeHtml(name)}</span>`).join(' ') : '<span class="muted">Não definida</span>') : examLabels;
+      return `<tr><td><strong>${patientLabel}</strong> ${flags}</td><td>${roomDisplay}</td><td><span class="status-pill ${status === 'atendido' ? 'active' : status === 'cancelado' ? 'inactive' : ''}">${escapeHtml(operationalStatuses[status] || status)}</span></td><td>${action || '<span class="muted">—</span>'}</td></tr>`;
     }).join('');
   }
 
@@ -669,12 +675,7 @@ async function renderOperationalModules(profile, userId) {
         receptionCallButton.disabled = true;
         const visitId = receptionCallButton.dataset.visitId;
         const roomId = receptionCallButton.dataset.roomId;
-        const { data: pendingExam, error: pendingError } = await supabase.from('visit_exams').select('id').eq('visit_id', visitId).eq('status', 'pendente').order('display_order').limit(1).maybeSingle();
-        if (pendingError) throw pendingError;
-        if (pendingExam) {
-          const { error } = await supabase.from('visit_exams').update({ status: 'chamado', room_id: roomId }).eq('id', pendingExam.id);
-          if (error) throw error;
-        }
+        // Reception calls update the visit only. Exam room assignments remain unchanged.
         const { error: visitError } = await supabase.from('patient_visits').update({ status: 'chamado', room_id: roomId }).eq('id', visitId);
         if (visitError) throw visitError;
         operationalMessage('#operational-message', 'Paciente chamado pela recepção.');
