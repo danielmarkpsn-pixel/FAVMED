@@ -263,3 +263,6 @@ textarea:focus { outline: 3px solid #087f8c20; border-color: var(--teal); }
 .reception-action-options { position: absolute; z-index: 20; right: 0; top: calc(100% + 5px); display: grid; gap: 6px; width: min(240px, 75vw); padding: 9px; border: 1px solid var(--line); border-radius: 11px; background: #fff; box-shadow: 0 12px 32px #173c4a24; }
 .reception-action-options .secondary { width: 100%; text-align: left; white-space: normal; }
 .reception-action-options .patient-sheet-button, .reception-action-options .edit-patient-button { display: block; }
+
+/* Keep the expanded action choices inside the table flow (no clipping). */
+.reception-action-options { position: static; width: 100%; margin-top: 6px; box-shadow: none; }
