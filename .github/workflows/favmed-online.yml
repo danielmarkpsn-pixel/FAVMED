@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - feature/favmed-online-master-login
+      - migration/**
     paths:
       - "online/**"
       - "fila.json"
