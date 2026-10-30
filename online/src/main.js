@@ -346,7 +346,7 @@ async function renderOperationalModules(profile, userId) {
     professionalSelect.innerHTML = '<option value="">A definir</option>' + (professionalResult.data || []).map((p) => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.display_name || 'Profissional')}</option>`).join('');
   }
   if (roomSelect && !roomResult.error) {
-    roomSelect.innerHTML = (roomResult.data || []).map((r) => `<option value="${escapeHtml(r.id)}">${escapeHtml(r.name)}</option>`).join('');
+    roomSelect.innerHTML = (roomResult.data || []).filter((r) => r.room_type !== 'recepcao').map((r) => `<option value="${escapeHtml(r.id)}">${escapeHtml(r.name)}</option>`).join('');
   }
   if (professionalRoomFilter && !roomResult.error) {
     professionalRoomFilter.innerHTML = '<option value="">Todas as salas</option>' + (roomResult.data || []).map((r) => `<option value="${escapeHtml(r.id)}">${escapeHtml(r.name)}</option>`).join('');
