@@ -230,6 +230,7 @@ async function renderOperationalModules(profile, userId) {
   if (!panel) return;
   const canRegister = profile.role === 'recepcao';
   panel.innerHTML = `
+    <style>.row-action-menu{position:relative;display:inline-block}.row-action-menu>summary{list-style:none;cursor:pointer}.row-action-menu>summary::-webkit-details-marker{display:none}.row-action-menu[open] .row-action-options{display:flex;flex-direction:column;gap:6px;position:absolute;right:0;top:calc(100% + 4px);z-index:20;min-width:210px;max-height:320px;overflow:auto;padding:10px;background:#fff;border:1px solid #d7e2e8;border-radius:10px;box-shadow:0 8px 24px rgba(11,36,53,.12)}.patient-row-flags{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}</style>
     <div class="operational-heading">
       <div><p class="eyebrow">OPERAÇÃO CLÍNICA</p><h2>Módulos operacionais: ${profile.role === 'recepcao' ? 'RECEPÇÃO' : 'PROFISSIONAIS'}</h2><p class="muted">${profile.role === 'recepcao' ? 'Cadastro de pacientes, organização de salas, chamadas e acompanhamento da fila.' : 'Fila de atendimentos, chamadas, execução e conclusão dos exames.'}</p></div>
       <div class="operational-heading-actions"><a class="secondary" href="/sala" target="_blank" rel="noopener noreferrer">Abrir tela de chamadas</a><button class="secondary" id="refresh-operational" type="button">Atualizar dados</button></div>
@@ -361,7 +362,7 @@ async function renderOperationalModules(profile, userId) {
     if (!rows) return;
     rows.innerHTML = '<tr><td colspan="4">Carregando dados…</td></tr>';
     let visitsQuery = supabase.from('patient_visits')
-      .select('id, patient_id, visit_date, attendance_type, status, professional_id, room_id, checked_in_at, priority, aso_pending, aso_completed')
+      .select('id, patient_id, visit_date, attendance_type, status, professional_id, room_id, initial_room_ids, checked_in_at, priority, aso_pending, aso_completed')
       .eq('visit_date', todayLocal())
       .order('checked_in_at', { ascending: false }).limit(100);
     let assignedRoomId = '';
@@ -458,7 +459,7 @@ async function renderOperationalModules(profile, userId) {
           : profile.role === 'recepcao'
             ? `${sheetButton} ${editButton} ${['Recepção 1','Recepção 2','Recepção 3'].map((label) => { const station = (roomResult.data || []).find((room) => room.name.toLowerCase() === label.toLowerCase()); return station ? `<button type="button" class="secondary reception-call-button" data-visit-id="${escapeHtml(visit.id)}" data-room-id="${escapeHtml(station.id)}">Chamar na ${label}</button>` : ''; }).join(' ')} <button type="button" class="secondary priority-toggle-button" data-visit-id="${escapeHtml(visit.id)}" data-next-priority="${!visit.priority}">${visit.priority ? 'Retirar prioridade' : 'Marcar prioridade'}</button> <button type="button" class="secondary aso-toggle-button ${visit.aso_completed ? 'aso-completed' : visit.aso_pending ? 'aso-pending' : ''}" data-visit-id="${escapeHtml(visit.id)}" data-next-aso="${visit.aso_completed ? 'reset' : visit.aso_pending ? 'complete' : 'pending'}">${visit.aso_completed ? 'ASO REALIZADO ✓' : visit.aso_pending ? 'ASO PENDENTE · Marcar realizado' : 'Marcar ASO pendente'}</button>`
             : '');
-      const roomNames = [...new Set(visitExams.map((exam) => (roomResult.data || []).find((room) => room.id === exam.room_id)?.name).filter(Boolean))];
+      const roomNames = [...new Set(visitExams.map((exam) => (roomResult.data || []).find((room) => room.id === exam.room_id)?.name).filter(Boolean).concat((visit.initial_room_ids || []).map((id) => (roomResult.data || []).find((room) => room.id === id)?.name).filter(Boolean)))];
       const roomLabels = roomNames.length ? roomNames.map((name) => `<span class="exam-pill">${escapeHtml(name)}</span>`).join(' ') : '<span class="muted">Sala não definida</span>';
       const patientLabel = roomMode ? `Atendimento #${escapeHtml(visit.id.slice(0, 8))}` : escapeHtml(patient?.full_name || 'Paciente não visível');
       const flags = profile.role === 'recepcao' ? `${visit.priority ? '<span class="priority-flag">PRIORIDADE</span>' : ''}${visit.aso_completed ? '<span class="aso-flag aso-completed">ASO REALIZADO</span>' : visit.aso_pending ? '<span class="aso-flag aso-pending">ASO PENDENTE</span>' : ''}` : '';
