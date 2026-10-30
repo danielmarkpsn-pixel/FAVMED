@@ -12,11 +12,21 @@ using (
   private.current_active_role() in ('master', 'recepcao', 'profissional')
   or (
     private.current_active_role() = 'sala'
-    and exists (
-      select 1 from public.rooms r
-      where r.id = patient_visits.room_id
-        and r.assigned_profile_id = (select auth.uid())
-        and r.active is true
+    and (
+      exists (
+        select 1 from public.rooms r
+        where r.id = patient_visits.room_id
+          and r.assigned_profile_id = (select auth.uid())
+          and r.active is true
+      )
+      or exists (
+        select 1
+        from public.visit_exams e
+        join public.rooms r on r.id = e.room_id
+        where e.visit_id = patient_visits.id
+          and r.assigned_profile_id = (select auth.uid())
+          and r.active is true
+      )
     )
   )
 );
