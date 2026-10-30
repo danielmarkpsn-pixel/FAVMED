@@ -401,7 +401,6 @@ async function renderOperationalModules(profile, userId) {
       .select('id, patient_id, visit_date, attendance_type, exam_types, status, professional_id, room_id, initial_room_ids, checked_in_at, priority, aso_pending, aso_completed, reception_call_room_id, reception_call_label, reception_called_at')
       .eq('visit_date', todayLocal())
       .order('checked_in_at', { ascending: false }).limit(100);
-    if (profile.role === 'profissional') visitsQuery = visitsQuery.eq('professional_id', userId);
     const { data: visitRows, error: visitsError } = await visitsQuery;
     if (visitsError) {
       rows.innerHTML = '<tr><td colspan="4">Não foi possível carregar a fila. Verifique as permissões e a migração operacional.</td></tr>';
