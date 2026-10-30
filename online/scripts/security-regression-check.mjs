@@ -112,3 +112,23 @@ const publicCallsFallbackMigration = await readFile(new URL('../supabase/migrati
 assert.match(publicCallsFallbackMigration, /union all/i);
 assert.match(publicCallsFallbackMigration, /not exists \(select 1 from public\.visit_exams/);
 assert.match(publicCallsFallbackMigration, /grant select on public\.public_waiting_room_calls to anon/);
+
+const localWorkflowMigration = await readFile(new URL('../supabase/migrations/20261030150000_local_room_workflow_compatibility.sql', import.meta.url), 'utf8');
+const localCompat = await readFile(new URL('../src/local-compat.js', import.meta.url), 'utf8');
+assert.match(localWorkflowMigration, /create table if not exists public\.visit_room_workflows/);
+assert.match(localWorkflowMigration, /alter table public\.visit_room_workflows force row level security/);
+assert.match(localWorkflowMigration, /visit_room_workflows_update_room/);
+assert.match(localWorkflowMigration, /create or replace function public\.create_local_compatible_visit/);
+assert.match(localWorkflowMigration, /security invoker/);
+assert.match(localWorkflowMigration, /grant execute on function public\.create_local_compatible_visit/);
+assert.match(localWorkflowMigration, /reception_call_room_id/);
+assert.match(localWorkflowMigration, /initial_room_ids\)/);
+assert.match(localWorkflowMigration, /grant select on public\.public_waiting_room_calls to anon/);
+assert.doesNotMatch(localWorkflowMigration, /grant all on public\.visit_room_workflows/);
+assert.match(localCompat, /localPatientToOnline/);
+assert.match(localCompat, /onlineRecordsToLocal/);
+assert.match(frontend, /from\('visit_room_workflows'\)/);
+assert.match(frontend, /create_local_compatible_visit/);
+assert.match(frontend, /workflow-status-button/);
+assert.match(frontend, /reception_call_room_id/);
+assert.doesNotMatch(frontend, /pendingExam, error: pendingError/);
