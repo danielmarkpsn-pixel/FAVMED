@@ -554,6 +554,7 @@ async function renderOperationalModules(profile, userId) {
           },
           p_visit: {
             attendance_type: values.attendance_type || 'Pontual',
+            professional_id: values.professional_id || null,
             exam_types: values.attendance_type ? [values.attendance_type] : [],
             initial_room_ids: selectedRoomIds,
             room_id: selectedRoomIds[0] || null,
@@ -621,6 +622,7 @@ async function renderOperationalModules(profile, userId) {
     finally { button.disabled = false; button.textContent = 'Backup JSON'; }
   });
   document.querySelector('#operational-rows').addEventListener('click', async (event) => {
+    const workflowButton = event.target.closest('.workflow-status-button');
     const examButton = event.target.closest('.exam-status-button');
     const visitButton = event.target.closest('.visit-status-button');
     const receptionCallButton = event.target.closest('.reception-call-button');
@@ -718,16 +720,29 @@ async function renderOperationalModules(profile, userId) {
       if (receptionCallButton) {
         receptionCallButton.disabled = true;
         const visitId = receptionCallButton.dataset.visitId;
+        const isActive = receptionCallButton.dataset.active === 'true';
         const roomId = receptionCallButton.dataset.roomId;
-        const { data: pendingExam, error: pendingError } = await supabase.from('visit_exams').select('id').eq('visit_id', visitId).eq('status', 'pendente').order('display_order').limit(1).maybeSingle();
-        if (pendingError) throw pendingError;
-        if (pendingExam) {
-          const { error } = await supabase.from('visit_exams').update({ status: 'chamado', room_id: roomId }).eq('id', pendingExam.id);
-          if (error) throw error;
-        }
-        const { error: visitError } = await supabase.from('patient_visits').update({ status: 'chamado', room_id: roomId }).eq('id', visitId);
-        if (visitError) throw visitError;
-        operationalMessage('#operational-message', 'Paciente chamado pela recepção.');
+        const station = (roomResult.data || []).find((room) => room.id === roomId);
+        const payload = isActive
+          ? { reception_call_room_id: null, reception_call_label: null, reception_called_at: null }
+          : { reception_call_room_id: roomId, reception_call_label: station?.name || 'Recepção', reception_called_at: new Date().toISOString() };
+        const { error } = await supabase.from('patient_visits').update(payload).eq('id', visitId);
+        if (error) throw error;
+        operationalMessage('#operational-message', isActive ? 'Chamada da recepção cancelada.' : 'Paciente chamado pela recepção.');
+        await loadOperationalRows();
+      } else if (workflowButton) {
+        workflowButton.disabled = true;
+        const nextStatus = workflowButton.dataset.nextStatus;
+        const { error } = await supabase.from('visit_room_workflows')
+          .update({ status: nextStatus }).eq('id', workflowButton.dataset.workflowId);
+        if (error) throw error;
+        const messages = {
+          chamado: 'Paciente chamado para a sala. O painel público será atualizado.',
+          em_atendimento: 'Atendimento iniciado.',
+          liberado: 'Atendimento desta sala concluído.',
+          aguardando: 'Chamada cancelada.',
+        };
+        operationalMessage('#operational-message', messages[nextStatus] || 'Estado da sala atualizado.');
         await loadOperationalRows();
       } else if (examButton) {
         examButton.disabled = true;
