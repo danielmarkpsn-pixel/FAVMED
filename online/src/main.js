@@ -340,7 +340,7 @@ async function renderOperationalModules(profile, userId) {
   }
   const [professionalResult, roomResult] = await Promise.all([
     supabase.from('profiles').select('id, display_name').eq('role', 'profissional').eq('active', true).order('display_name'),
-    supabase.from('rooms').select('id, name').eq('active', true).order('display_order').order('name'),
+    supabase.from('rooms').select('id, name, room_type').eq('active', true).order('display_order').order('name'),
   ]);
   if (professionalSelect && !professionalResult.error) {
     professionalSelect.innerHTML = '<option value="">A definir</option>' + (professionalResult.data || []).map((p) => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.display_name || 'Profissional')}</option>`).join('');
@@ -349,7 +349,7 @@ async function renderOperationalModules(profile, userId) {
     roomSelect.innerHTML = (roomResult.data || []).filter((r) => r.room_type !== 'recepcao').map((r) => `<option value="${escapeHtml(r.id)}">${escapeHtml(r.name)}</option>`).join('');
   }
   if (professionalRoomFilter && !roomResult.error) {
-    professionalRoomFilter.innerHTML = '<option value="">Todas as salas</option>' + (roomResult.data || []).map((r) => `<option value="${escapeHtml(r.id)}">${escapeHtml(r.name)}</option>`).join('');
+    professionalRoomFilter.innerHTML = '<option value="">Todas as salas</option>' + (roomResult.data || []).filter((r) => r.room_type !== 'recepcao').map((r) => `<option value="${escapeHtml(r.id)}">${escapeHtml(r.name)}</option>`).join('');
   }
 
   const roomRows = document.querySelector('#room-list-rows');
