@@ -117,7 +117,7 @@ on public.visit_room_workflows for delete to authenticated
 using (private.current_active_role() = 'master');
 
 grant select, insert, delete on public.visit_room_workflows to authenticated;
-grant update (status, call_label, called_at, started_at, released_at, updated_by, display_order, updated_at)
+grant update (status, call_label, display_order)
   on public.visit_room_workflows to authenticated;
 
 -- Reception-station calls are separate from exam/room calls.
@@ -162,6 +162,33 @@ drop trigger if exists patient_visits_guard_reception_station_call on public.pat
 create trigger patient_visits_guard_reception_station_call
 before update on public.patient_visits
 for each row execute function private.guard_reception_station_call();
+
+
+create or replace function private.guard_visit_room_workflow_update()
+returns trigger
+language plpgsql
+security invoker
+set search_path = pg_catalog
+as $
+begin
+  if private.current_active_role() = 'sala'
+     and (
+       new.service_key is distinct from old.service_key
+       or new.room_id is distinct from old.room_id
+       or new.service_label is distinct from old.service_label
+       or new.call_label is distinct from old.call_label
+       or new.display_order is distinct from old.display_order
+     ) then
+    raise exception 'A conta da sala pode alterar somente o estado do atendimento.';
+  end if;
+  return new;
+end;
+$;
+revoke all on function private.guard_visit_room_workflow_update() from public, anon, authenticated;
+drop trigger if exists visit_room_workflows_guard_update on public.visit_room_workflows;
+create trigger visit_room_workflows_guard_update
+before update on public.visit_room_workflows
+for each row execute function private.guard_visit_room_workflow_update();
 
 create or replace function private.visit_room_workflows_set_updated_at()
 returns trigger
