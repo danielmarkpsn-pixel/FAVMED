@@ -228,10 +228,10 @@ function operationalMessage(target, message, isError = false) {
 async function renderOperationalModules(profile, userId) {
   const panel = document.querySelector('#operational-panel');
   if (!panel) return;
-  const canRegister = ['master', 'recepcao'].includes(profile.role);
+  const canRegister = profile.role === 'recepcao';
   panel.innerHTML = `
     <div class="operational-heading">
-      <div><p class="eyebrow">OPERAÇÃO CLÍNICA</p><h2>Módulos operacionais</h2></div>
+      <div><p class="eyebrow">OPERAÇÃO CLÍNICA</p><h2>Módulos operacionais: ${profile.role === 'recepcao' ? 'RECEPÇÃO' : 'PROFISSIONAIS'}</h2><p class="muted">${profile.role === 'recepcao' ? 'Cadastro de pacientes, organização de salas, chamadas e acompanhamento da fila.' : 'Fila de atendimentos, chamadas, execução e conclusão dos exames.'}</p></div>
       <div class="operational-heading-actions"><a class="secondary" href="/sala" target="_blank" rel="noopener noreferrer">Abrir tela de chamadas</a><button class="secondary" id="refresh-operational" type="button">Atualizar dados</button></div>
     </div>
     ${canRegister ? `
@@ -255,8 +255,7 @@ async function renderOperationalModules(profile, userId) {
             <summary>Tipo de Exame / Atendimento</summary>
             <div class="module-content">
               <div class="field"><label for="visit-type">TIPO DE EXAME / ATENDIMENTO *</label><select id="visit-type" name="attendance_type" required><option value="Admissional">Admissional</option><option value="Demissional">Demissional</option><option value="Periódico">Periódico</option><option value="Retorno">Retorno</option><option value="Mudança de riscos">Mudança de riscos</option><option value="Particular">Particular</option><option value="Pontual">Pontual</option><option value="Consulta Ocupacional">Consulta Ocupacional</option><option value="Concurso">Concurso</option><option value="Agendado">Agendado</option></select></div>
-              <div class="field"><label for="visit-professional">PROFISSIONAL</label><select id="visit-professional" name="professional_id"><option value="">A definir</option></select></div>
-              <div class="field"><label for="visit-room">SALA INICIAL</label><select id="visit-room" name="room_id"><option value="">A definir</option></select><p class="sub" style="margin:7px 0 0">A sala inicial pode ser definida agora ou durante o atendimento.</p></div>
+              <div class="field"><label for="visit-room">SALA</label><select id="visit-room" name="room_ids" multiple size="5" aria-describedby="visit-room-help"></select><p class="sub" id="visit-room-help">Selecione uma ou várias salas. Use Ctrl (Windows) ou Command (Mac) para marcar mais de uma.</p></div>
             </div>
           </details>
           <details class="form-module">
@@ -280,7 +279,7 @@ async function renderOperationalModules(profile, userId) {
 
     ${profile.role === 'recepcao' ? `
       <section class="module-card">
-        <h3>Recepção · Configurar salas e exames</h3>
+        <h3>Editar salas</h3>
         <p class="muted">Cadastre e organize as salas utilizadas pela recepção e pelos profissionais. O painel de chamadas funciona sem login.</p>
         <form id="room-setup-form" class="operational-form">
           <div class="form-grid">
@@ -290,7 +289,7 @@ async function renderOperationalModules(profile, userId) {
           <button class="submit" id="room-create-submit" type="submit">Salvar sala</button>
           <p id="room-setup-message" class="message" role="status"></p>
         </form>
-        <div class="table-wrap"><table class="users-table"><thead><tr><th>Sala</th><th>Tipo</th><th>Status</th></tr></thead><tbody id="room-list-rows"><tr><td colspan="3">Carregando salas…</td></tr></tbody></table></div>
+        <div class="table-wrap"><table class="users-table"><thead><tr><th>Sala</th><th>Tipo</th><th>Status</th><th>Ação</th></tr></thead><tbody id="room-list-rows"><tr><td colspan="4">Carregando salas…</td></tr></tbody></table></div>
       </section>` : ''}
     <section class="module-card">
       <div class="users-heading"><h3>${profile.role === 'sala' ? 'Exames desta sala' : profile.role === 'profissional' ? 'Painel do profissional' : 'Pacientes na fila'}</h3><span class="muted" id="operational-count"></span></div>
@@ -326,12 +325,12 @@ async function renderOperationalModules(profile, userId) {
       const values = Object.fromEntries(new FormData(form).entries());
       button.disabled = true;
       try {
-        const { error } = await supabase.from('rooms').insert({
-          name: String(values.name || '').trim(),
-          room_type: values.room_type,
-        });
+        const roomId = form.dataset.editRoomId;
+        const payload = { name: String(values.name || '').trim(), room_type: values.room_type };
+        const { error } = roomId ? await supabase.from('rooms').update(payload).eq('id', roomId) : await supabase.from('rooms').insert(payload);
         if (error) throw error;
-        operationalMessage('#room-setup-message', 'Sala cadastrada.');
+        form.reset(); delete form.dataset.editRoomId; document.querySelector('#room-create-submit').textContent = 'Salvar sala';
+        operationalMessage('#room-setup-message', roomId ? 'Sala atualizada.' : 'Sala cadastrada.');
         await renderOperationalModules(profile, userId);
       } catch (error) {
         operationalMessage('#room-setup-message', error.message || 'Não foi possível cadastrar a sala.', true);
@@ -347,11 +346,15 @@ async function renderOperationalModules(profile, userId) {
     professionalSelect.innerHTML = '<option value="">A definir</option>' + (professionalResult.data || []).map((p) => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.display_name || 'Profissional')}</option>`).join('');
   }
   if (roomSelect && !roomResult.error) {
-    roomSelect.innerHTML = '<option value="">A definir</option>' + (roomResult.data || []).map((r) => `<option value="${escapeHtml(r.id)}">${escapeHtml(r.name)}</option>`).join('');
+    roomSelect.innerHTML = (roomResult.data || []).map((r) => `<option value="${escapeHtml(r.id)}">${escapeHtml(r.name)}</option>`).join('');
   }
   if (professionalRoomFilter && !roomResult.error) {
     professionalRoomFilter.innerHTML = '<option value="">Todas as salas</option>' + (roomResult.data || []).map((r) => `<option value="${escapeHtml(r.id)}">${escapeHtml(r.name)}</option>`).join('');
   }
+
+  const roomRows = document.querySelector('#room-list-rows');
+  if (roomRows && roomResult.data) roomRows.innerHTML = roomResult.data.map((room) => `<tr><td>${escapeHtml(room.name)}</td><td>${escapeHtml(room.room_type)}</td><td><span class="status-pill active">Ativa</span></td><td><button type="button" class="secondary edit-room-button" data-room-id="${escapeHtml(room.id)}" data-room-name="${escapeHtml(room.name)}" data-room-type="${escapeHtml(room.room_type)}">Editar</button></td></tr>`).join('') || '<tr><td colspan="4">Nenhuma sala cadastrada.</td></tr>';
+  roomRows?.addEventListener('click', (event) => { const edit = event.target.closest('.edit-room-button'); if (!edit) return; const form = document.querySelector('#room-setup-form'); if (!form) return; form.dataset.editRoomId = edit.dataset.roomId; form.elements.name.value = edit.dataset.roomName; form.elements.room_type.value = edit.dataset.roomType; document.querySelector('#room-create-submit').textContent = 'Atualizar sala'; form.scrollIntoView({behavior:'smooth',block:'center'}); });
 
   async function loadOperationalRows() {
     const rows = document.querySelector('#operational-rows');
@@ -469,7 +472,9 @@ async function renderOperationalModules(profile, userId) {
       event.preventDefault();
       const form = event.currentTarget;
       const button = document.querySelector('#checkin-submit');
-      const values = Object.fromEntries(new FormData(form).entries());
+      const formData = new FormData(form);
+      const values = Object.fromEntries(formData.entries());
+      const selectedRoomIds = formData.getAll('room_ids').filter(Boolean);
       const cpf = String(values.cpf || '').replace(/\D/g, '');
       const documentFile = form.querySelector('#patient-pdf')?.files?.[0] || null;
       if (documentFile && (documentFile.size > 10 * 1024 * 1024 || (documentFile.type && documentFile.type !== 'application/pdf') || !documentFile.name.toLowerCase().endsWith('.pdf'))) {
@@ -498,8 +503,8 @@ async function renderOperationalModules(profile, userId) {
         const { data: visit, error: visitError } = await supabase.from('patient_visits').insert({
           patient_id: patient.id,
           attendance_type: values.attendance_type,
-          professional_id: values.professional_id || null,
-          room_id: values.room_id || null,
+          room_id: selectedRoomIds[0] || null,
+          initial_room_ids: selectedRoomIds,
           company_name: String(values.company_name || '').trim() || null,
           priority: values.priority === 'true',
           aso_pending: values.aso_pending === 'true',
@@ -510,7 +515,7 @@ async function renderOperationalModules(profile, userId) {
         if (examNames.length) {
           const roomIdByName = new Map((roomResult.data || []).map((room) => [room.name, room.id]));
           const examRows = examNames.map((exam, index) => ({
-            visit_id: visit.id, exam_name: exam.name, room_id: roomIdByName.get(exam.roomName) || values.room_id || null, display_order: index,
+            visit_id: visit.id, exam_name: exam.name, room_id: roomIdByName.get(exam.roomName) || selectedRoomIds[0] || null, display_order: index,
           }));
           const { error: examError } = await supabase.from('visit_exams').insert(examRows);
           if (examError) throw new Error(`Atendimento criado, mas não foi possível salvar os exames: ${examError.message}`);
