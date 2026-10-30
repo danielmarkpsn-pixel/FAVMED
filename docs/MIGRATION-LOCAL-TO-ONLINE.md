@@ -110,3 +110,29 @@ Não existe atualmente uma tabela que represente o estado independente de cada s
 A chamada de Recepção 1/2/3 também é um fluxo separado da chamada para sala de exame e precisa de campos/eventos próprios, sem reutilizar indevidamente o status de um exame.
 
 Essa estrutura evita uma conversão superficial que pareça funcionar na recepção, mas altere a operação do painel profissional.
+
+
+## Implementação realizada na branch (2026-10-30)
+
+- Criada a migração aditiva `20261030150000_local_room_workflow_compatibility.sql`.
+- Criada a tabela `visit_room_workflows`, com estado independente por atendimento/sala, timestamps, histórico de chamada e RLS para Master, recepção, profissional e conta de sala.
+- Chamadas de Recepção 1/2/3 foram separadas dos estados de exames e salas; a recepção não precisa mais alterar `visit_exams` para chamar um paciente.
+- A view pública de chamadas agora agrega chamadas das estações de recepção e dos fluxos por sala, mantendo apenas nome abreviado e destino.
+- A política de leitura das salas considera todas as salas selecionadas, não somente a primeira.
+- A fila do profissional mantém o comportamento local compartilhado para atendimentos sem profissional atribuído; atendimentos atribuídos a outro profissional permanecem restritos.
+- Criada a RPC `create_local_compatible_visit` como `SECURITY INVOKER` para inserir paciente, visita, fluxos e exames em uma única transação, respeitando RLS.
+- Criado `online/src/local-compat.js` para conversão nos dois sentidos e testes sintéticos em `online/scripts/local-compat.test.mjs`.
+- A tela online passou a criar e atualizar fluxos por sala, atualizar a fila automaticamente a cada 5 segundos e incluir os fluxos no backup JSON.
+- O cadastro online agora aceita vários tipos de atendimento e exige CPF, nascimento, convênio, função, sala, tipo de atendimento e ao menos um exame por sala selecionada.
+
+## Verificação desta etapa
+
+- GitHub Actions: execução `41070253090` concluída com sucesso (checagem de sintaxe, testes do adaptador, guardrails de segurança, verificação da Edge Function e build Vite).
+- `main` continua no commit `802958ad4cb3e913a3c076235c97f2af0ddddea5`.
+- Branch de migração no commit `796e0c25283bedc3082914ffd1c97104eaf7a34b`.
+- A integração Vercel automática reportou limite de deploy de preview por 24 horas; não é falha do build do GitHub Actions.
+- A migração SQL ainda **não foi aplicada** a nenhum projeto Supabase. Portanto, a validação real de RLS, RPC, Storage e sincronização entre sessões depende de um projeto de teste isolado.
+
+## Ainda não concluído
+
+A interface online ainda contém a aplicação visual própria. A migração fiel do HTML/CSS e dos fluxos completos de `index.html` e `consultorio.html` para a autenticação online é a próxima etapa. Não declarar a migração integral concluída até que essas páginas originais estejam conectadas aos adaptadores e aprovadas em testes funcionais.
