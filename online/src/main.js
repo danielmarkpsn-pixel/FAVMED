@@ -313,7 +313,7 @@ async function renderOperationalModules(profile, userId) {
         <button class="secondary" id="export-operational-csv" type="button">Exportar CSV</button>
         ${profile.role === 'recepcao' ? '<button class="secondary" id="backup-operational-json" type="button">Backup JSON</button>' : ''}
       </div>
-      \${profile.role === 'profissional'
+      ${profile.role === 'profissional'
         ? '<div id="operational-rows" class="professional-cards"><div class="empty">Carregando fila compartilhada…</div></div>'
         : '<div class="table-wrap"><table class="users-table operational-table"><thead><tr><th>Paciente</th><th>Salas</th><th>Status</th><th>Ação</th></tr></thead><tbody id="operational-rows"><tr><td colspan="4">Carregando dados…</td></tr></table></div>'}
       <p id="operational-message" class="message" role="status"></p>

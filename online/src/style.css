@@ -339,3 +339,75 @@ textarea:focus { outline: 3px solid #087f8c20; border-color: var(--teal); }
 @media (prefers-reduced-motion: reduce) {
   .professional-card.blinking, .room-call-card.blinking { animation: none; }
 }
+
+
+/* Recepção online: fila em cartões, seguindo a leitura visual do ZIP local.
+   Mantém as células/tabela sem alterar a lógica Supabase nem os handlers de ação. */
+.operational-table {
+  min-width: 0;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 0;
+  background: transparent;
+}
+.operational-table thead { display: none; }
+.operational-table tbody {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+}
+.operational-table tbody tr {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #e0e8ec;
+  border-radius: 12px;
+  background: #fbfdfe;
+  box-shadow: 0 5px 18px #1b3a4408;
+}
+.operational-table tbody td {
+  display: block;
+  min-width: 0 !important;
+  padding: 5px 2px;
+  border: 0;
+  overflow-wrap: anywhere;
+  vertical-align: top;
+}
+.operational-table tbody td:nth-child(2)::before {
+  content: "Salas: ";
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 750;
+}
+.operational-table tbody td:nth-child(3)::before {
+  content: "Status: ";
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 750;
+}
+.operational-table tbody td:last-child {
+  padding-top: 8px;
+  border-top: 1px solid #e7eef1;
+}
+.operational-table tbody td:last-child > button,
+.operational-table tbody td:last-child .row-action-menu {
+  max-width: 100%;
+}
+.operational-table tbody td:last-child .row-action-options {
+  max-width: min(90vw, 320px);
+}
+.operational-table tbody tr td[colspan] {
+  text-align: center;
+  padding: 24px 12px;
+  color: var(--muted);
+}
+@media (max-width: 520px) {
+  .operational-table tbody { padding: 6px; }
+  .operational-table tbody tr { padding: 8px; }
+  .operational-table tbody td:last-child .row-action-options {
+    right: auto;
+    left: 0;
+  }
+}
