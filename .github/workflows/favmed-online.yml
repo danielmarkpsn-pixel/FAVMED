@@ -16,6 +16,11 @@ on:
       - "consultorio/**"
       - "sala/**"
       - "scripts/check-local-parity.mjs"
+      - ".github/workflows/favmed-online.yml"
+  pull_request:
+    paths:
+      - "online/**"
+      - "fila.json"
       - "index.html"
       - "consultorio.html"
       - "favmed-*.js"
@@ -23,11 +28,6 @@ on:
       - "consultorio/**"
       - "sala/**"
       - "scripts/check-local-parity.mjs"
-      - ".github/workflows/favmed-online.yml"
-  pull_request:
-    paths:
-      - "online/**"
-      - "fila.json"
       - ".github/workflows/favmed-online.yml"
   workflow_dispatch:
 
