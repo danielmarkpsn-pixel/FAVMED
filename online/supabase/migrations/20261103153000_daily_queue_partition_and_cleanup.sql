@@ -182,9 +182,9 @@ where id in ('favmed-documents','favmed-media','patient-documents');
 create extension if not exists pg_cron with schema pg_catalog;
 do $$
 begin
-  if exists(select 1 from cron.job where jobname='favmed-daily-reset') then
-    perform cron.unschedule('favmed-daily-reset');
-  end if;
+  perform cron.unschedule(jobid)
+  from cron.job
+  where jobname='favmed-daily-reset';
 end $$;
 select cron.schedule('favmed-daily-reset','5 4 * * *',
   $$select app_private.favmed_daily_cleanup();$$);
