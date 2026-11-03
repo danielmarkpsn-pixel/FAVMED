@@ -10,6 +10,7 @@ const configured = Boolean(supabaseUrl && supabaseKey);
 // Supabase PKCE recovery links can arrive as ?code=... without type=recovery.
 // PASSWORD_RECOVERY is the reliable signal for that flow.
 let passwordRecoveryInProgress = false;
+let operationalRealtimeChannel = null;
 const supabase = configured ? createClient(supabaseUrl, supabaseKey, {
   auth: { autoRefreshToken: true, persistSession: true, detectSessionInUrl: true },
 }) : null;
@@ -313,7 +314,7 @@ async function renderOperationalModules(profile, userId) {
         <button class="secondary" id="export-operational-csv" type="button">Exportar CSV</button>
         ${profile.role === 'recepcao' ? '<button class="secondary" id="backup-operational-json" type="button">Backup JSON</button>' : ''}
       </div>
-      \${profile.role === 'profissional'
+      ${profile.role === 'profissional'
         ? '<div id="operational-rows" class="professional-cards"><div class="empty">Carregando fila compartilhada…</div></div>'
         : '<div class="table-wrap"><table class="users-table operational-table"><thead><tr><th>Paciente</th><th>Salas</th><th>Status</th><th>Ação</th></tr></thead><tbody id="operational-rows"><tr><td colspan="4">Carregando dados…</td></tr></table></div>'}
       <p id="operational-message" class="message" role="status"></p>
@@ -881,6 +882,28 @@ async function renderOperationalModules(profile, userId) {
       if (cancelExamCallButton) cancelExamCallButton.disabled = false;
     }
   });
+
+  // Atualiza os painéis em todos os dispositivos quando a fila compartilhada muda.
+  // A tela de chamadas continua usando sua consulta periódica independente.
+  if (operationalRealtimeChannel) {
+    await supabase.removeChannel(operationalRealtimeChannel);
+    operationalRealtimeChannel = null;
+  }
+  let realtimeRefreshTimer = null;
+  const scheduleRealtimeRefresh = () => {
+    if (realtimeRefreshTimer) window.clearTimeout(realtimeRefreshTimer);
+    realtimeRefreshTimer = window.setTimeout(() => {
+      realtimeRefreshTimer = null;
+      void loadOperationalRows();
+    }, 150);
+  };
+  operationalRealtimeChannel = supabase.channel(`favmed-operational-${userId}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'patients' }, scheduleRealtimeRefresh)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'patient_visits' }, scheduleRealtimeRefresh)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'visit_exams' }, scheduleRealtimeRefresh)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms' }, scheduleRealtimeRefresh)
+    .subscribe();
+
   await loadOperationalRows();
 }
 
@@ -1108,6 +1131,10 @@ if (configured) {
       return;
     }
     if (event === 'SIGNED_OUT') {
+      if (operationalRealtimeChannel) {
+        void supabase.removeChannel(operationalRealtimeChannel);
+        operationalRealtimeChannel = null;
+      }
       passwordRecoveryInProgress = false;
       renderLogin();
     }
