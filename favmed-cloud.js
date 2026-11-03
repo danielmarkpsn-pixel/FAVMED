@@ -58,6 +58,45 @@
     return queue;
   }
 
+  async function uploadResumable(bucket, path, file, onProgress) {
+    if (!window.tus || typeof window.tus.Upload !== "function") {
+      throw new Error("O módulo de envio de arquivos grandes não foi carregado. Atualize a página.");
+    }
+    const { data, error } = await client.auth.getSession();
+    if (error) throw error;
+    if (!data || !data.session) throw new Error("Sua sessão expirou. Entre novamente.");
+    return await new Promise((resolve, reject) => {
+      const upload = new window.tus.Upload(file, {
+        endpoint: "https://qzjkoyqmjueosevzhxqa.storage.supabase.co/storage/v1/upload/resumable",
+        retryDelays: [0, 3000, 5000, 10000, 20000],
+        headers: {
+          authorization: "Bearer " + data.session.access_token,
+          apikey: SUPABASE_PUBLISHABLE_KEY,
+          "x-upsert": "false"
+        },
+        uploadDataDuringCreation: true,
+        removeFingerprintOnSuccess: true,
+        chunkSize: 6 * 1024 * 1024,
+        metadata: {
+          bucketName: bucket,
+          objectName: path,
+          contentType: file.type || "application/octet-stream",
+          cacheControl: "3600",
+          metadata: JSON.stringify({ originalName: file.name })
+        },
+        onError: reject,
+        onProgress(bytesUploaded, bytesTotal) {
+          if (typeof onProgress === "function") onProgress(Math.floor(bytesUploaded / bytesTotal * 100));
+        },
+        onSuccess: resolve
+      });
+      upload.findPreviousUploads().then(previous => {
+        if (previous.length) upload.resumeFromPreviousUpload(previous[0]);
+        upload.start();
+      }).catch(reject);
+    });
+  }
+
   window.FAVMED_AUTH_READY = authReady;
   window.FAVMED_CLOUD = {
     client,
@@ -102,10 +141,14 @@
         throw new Error("Anexe um PDF válido de até 10 MB.");
       }
       const path = "patients/" + safeSegment(patientId) + "/" + Date.now() + "-" + safeSegment(file.name);
-      const { data, error } = await client.storage.from("favmed-documents").upload(path, file, {
-        contentType: "application/pdf", upsert: false
-      });
-      if (error) throw error;
+      if (file.size > 6 * 1024 * 1024) {
+        await uploadResumable("favmed-documents", path, file);
+      } else {
+        const { error } = await client.storage.from("favmed-documents").upload(path, file, {
+          contentType: "application/pdf", upsert: false
+        });
+        if (error) throw error;
+      }
       const storedPath = data && data.path || path;
       const url = await createSignedUrl("favmed-documents", storedPath);
       return { name: file.name, path: storedPath, url };
@@ -127,7 +170,7 @@
         return { name: displayName, type, url: signedUrl };
       }));
     },
-    async uploadSlideshow(file) {
+    async uploadSlideshow(file, onProgress) {
       await authReady;
       if (!currentProfile || !["master", "recepcao"].includes(currentProfile.role)) {
         throw new Error("Somente a recepção pode enviar fotos e vídeos para a sala.");
@@ -136,10 +179,14 @@
         throw new Error("Envie uma foto ou vídeo de até 500 MB.");
       }
       const path = "media/" + Date.now() + "_" + safeSegment(file.name);
-      const { error } = await client.storage.from("favmed-media").upload(path, file, {
-        contentType: file.type, upsert: false
-      });
-      if (error) throw error;
+      if (file.size > 6 * 1024 * 1024) {
+        await uploadResumable("favmed-media", path, file, onProgress);
+      } else {
+        const { error } = await client.storage.from("favmed-media").upload(path, file, {
+          contentType: file.type, upsert: false
+        });
+        if (error) throw error;
+      }
       signedUrlCache.delete("favmed-media:" + path);
       return true;
     }
