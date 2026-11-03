@@ -137,8 +137,8 @@
       if (!currentProfile || !["master", "recepcao"].includes(currentProfile.role)) {
         throw new Error("Somente a recepção pode anexar documentos de pacientes.");
       }
-      if (!file || file.size > 10 * 1024 * 1024 || (file.type && file.type !== "application/pdf")) {
-        throw new Error("Anexe um PDF válido de até 10 MB.");
+      if (!file || file.size > 50 * 1024 * 1024 || (file.type && file.type !== "application/pdf")) {
+        throw new Error("Anexe um PDF válido de até 50 MB.");
       }
       const path = "patients/" + safeSegment(patientId) + "/" + Date.now() + "-" + safeSegment(file.name);
       if (file.size > 6 * 1024 * 1024) {
@@ -175,8 +175,8 @@
       if (!currentProfile || !["master", "recepcao"].includes(currentProfile.role)) {
         throw new Error("Somente a recepção pode enviar fotos e vídeos para a sala.");
       }
-      if (!file || !/^(image|video)\//i.test(file.type) || file.size > 524288000) {
-        throw new Error("Envie uma foto ou vídeo de até 500 MB.");
+      if (!file || !/^(image|video)\//i.test(file.type) || file.size > 52428800) {
+        throw new Error("Envie uma foto ou vídeo de até 50 MB.");
       }
       const path = "media/" + Date.now() + "_" + safeSegment(file.name);
       if (file.size > 6 * 1024 * 1024) {
