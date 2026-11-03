@@ -85,7 +85,7 @@ html.favmed-auth-checking body{visibility:hidden}
   <section class="panel">
    <div class="queuehead"><div><h3>Pacientes na fila</h3><p class="sub">Chame, repita a chamada ou finalize o atendimento.</p></div><input class="search" id="search" placeholder="Buscar paciente…" aria-label="Buscar paciente"></div>
    <div class="patient-list" id="patientList"></div>
-   <div class="actions" style="margin-top:14px"><button class="btn ghost" id="clearAttended" type="button">Limpar atendidos</button><button class="btn ghost" id="visualizarFicha" type="button">Visualizar Ficha</button><button class="btn danger" id="exportCsv" type="button">Exportar CSV</button><button class="btn ghost" id="backupJson" type="button">Backup JSON</button></div>
+   <div class="actions" style="margin-top:14px"><button class="btn ghost" id="clearAttended" type="button">Limpar atendidos</button><button class="btn danger" id="clearToday" type="button">Limpar fila do dia</button><button class="btn ghost" id="visualizarFicha" type="button">Visualizar Ficha</button><button class="btn danger" id="exportCsv" type="button">Exportar CSV</button><button class="btn ghost" id="backupJson" type="button">Backup JSON</button></div>
    <p class="footnote">A chamada anuncia o nome do paciente e somente a sala indicada. O tipo de atendimento fica visível no painel profissional.</p>
   </section>
  </div>
@@ -432,6 +432,18 @@ case"editservices":{openPatientEditor(p);break;}
 case"priority":p.priority=!p.priority;save();render();break;case"asoComplete":if(!p.asoPending&&!p.asoCompleted)break;p.asoCompleted=true;p.asoPending=false;p.asoCompletedAt=Date.now();save();render();notify("ASO marcado como realizado.");break;
 case"remove":if(confirm("Remover "+p.name+" da fila?")){requestDeletePassword().then(password=>{if(password===null)return;if(password!=="7931"){notify("Senha incorreta. O paciente não foi excluído.");return;}patients=patients.filter(x=>String(x.id)!==String(p.id));save();render();});}break;
 }});
+$("clearToday").addEventListener("click",async()=>{
+ const n=patients.filter(p=>p.day===todayKey).length;
+ if(!n){notify("A fila de hoje já está vazia.");return;}
+ if(!confirm("Excluir todos os pacientes, exames selecionados e status da fila de hoje? Esta ação não pode ser desfeita."))return;
+ const password=await requestDeletePassword();
+ if(password===null)return;
+ if(password!=="7931"){notify("Senha incorreta. Nenhum dado foi excluído.");return;}
+ const previous=patients;
+ patients=patients.filter(p=>p.day!==todayKey);
+ if(await save()){render();notify(n+" registro(s) removido(s) da fila de hoje.");}
+ else{patients=previous;render();}
+});
 $("clearAttended").addEventListener("click",async()=>{const n=patients.filter(p=>p.day===todayKey&&p.status==="Atendido").length;if(!n){notify("Não há atendidos para limpar.");return;}if(!confirm("Remover "+n+" paciente(s) atendido(s) da lista de hoje?"))return;const password=await requestDeletePassword();if(password===null)return;if(password!=="7931"){notify("Senha incorreta. Nenhum paciente foi excluído.");return;}patients=patients.filter(p=>!(p.day===todayKey&&p.status==="Atendido"));save();render();});
 $("exportCsv").addEventListener("click",()=>{const rows=[["Nome","Sala(s)","Atendimento(s)","Status","Data","Hora de chegada","Saída","Prioridade"],...patients.filter(p=>p.day===todayKey).map(p=>[p.name,roomsText(p),servicesText(p),p.status,p.day,p.time,p.exitTime||"",p.priority?"Sim":"Não"])];const csv="\ufeff"+rows.map(r=>r.map(v=>'"'+String(v??"").replace(/"/g,'""')+'"').join(";")).join("\r\n");const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="favmed-fila-"+todayKey+".csv";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
 $("backupJson").addEventListener("click",()=>{const blob=new Blob([JSON.stringify(patients,null,2)],{type:"application/json;charset=utf-8"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="favmed-backup-"+todayKey+".json";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
