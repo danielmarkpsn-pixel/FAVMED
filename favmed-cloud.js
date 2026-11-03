@@ -46,11 +46,15 @@
     return url;
   }
   async function hydratePatientDocuments(queue) {
-    for (const patient of queue) {
+    await Promise.all(queue.map(async patient => {
       if (patient && patient.document && patient.document.path) {
-        patient.document.url = await createSignedUrl("favmed-documents", patient.document.path);
+        try {
+          patient.document.url = await createSignedUrl("favmed-documents", patient.document.path);
+        } catch (_) {
+          patient.document.url = "";
+        }
       }
-    }
+    }));
     return queue;
   }
 
