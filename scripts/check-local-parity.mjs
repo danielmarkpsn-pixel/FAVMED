@@ -19,7 +19,7 @@ const professional = readFileSync("consultorio.html", "utf8");
 const cloud = readFileSync("favmed-cloud.js", "utf8");
 const auth = readFileSync("favmed-auth.js", "utf8");
 
-for (const id of ["patientForm", "patientList", "calledDisplay", "publicScreen", "slideshowFiles", "visualizarFicha"]) {
+for (const id of ["patientForm", "patientList", "calledDisplay", "publicScreen", "slideshowFiles", "visualizarFicha", "clearToday"]) {
   if (!reception.includes('id="' + id + '"')) throw new Error("Tela local da recepção perdeu o elemento " + id);
 }
 if (!professional.includes("FAVMED — Painel do profissional")) throw new Error("Painel profissional local não encontrado.");
