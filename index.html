@@ -74,7 +74,8 @@ main{max-width:1400px;margin:auto;padding:26px clamp(14px,3vw,32px) 40px}.hero{d
 "use strict";
 const KEY="favmed_local_queue_v1";
 const publicMode=new URLSearchParams(location.search).get("painel")==="1"||location.pathname==="/sala"||location.pathname==="/sala/";
-const serverMode=location.protocol==="http:"||location.protocol==="https:";
+const isLocalServer=location.hostname==="localhost"||location.hostname==="127.0.0.1"||/^192\.168\.|^10\.|^172\.(1[6-9]|2\d|3[01])\./.test(location.hostname);
+const serverMode=(location.protocol==="http:"||location.protocol==="https:")&&isLocalServer;
 let patients=[];
 let saveInProgress=0;
 let lastAnnouncement="";
