@@ -79,7 +79,10 @@ assert.match(publicWaitingMigration, /v\.status = 'em_atendimento'/);
 const publicWaitingColumns = publicWaitingMigration.split('as\nselect')[1]?.split('\nfrom public.patient_visits')[0] || '';
 assert.doesNotMatch(publicWaitingColumns, /cpf|birth_date|company_name|exam_name/i);
 
-const salaAccessMigration = await readFile(new URL('../supabase/migrations/20261103153000_grant_authenticated_waiting_room_read.sql', import.meta.url), 'utf8');
+const realtimeMigration = await readFile(new URL('../supabase/migrations/20261103135443_enable_favmed_operational_realtime.sql', import.meta.url), 'utf8');
+for (const table of ['patients', 'patient_visits', 'visit_exams', 'rooms']) assert.match(realtimeMigration, new RegExp(table));
+
+const salaAccessMigration = await readFile(new URL('../supabase/migrations/20261103140318_grant_authenticated_waiting_room_read.sql', import.meta.url), 'utf8');
 assert.match(salaAccessMigration, /grant select on public\.public_waiting_room_calls to authenticated/);
 
 const calledStatusMigration = await readFile(new URL('../supabase/migrations/20261029202000_visit_called_status.sql', import.meta.url), 'utf8');
