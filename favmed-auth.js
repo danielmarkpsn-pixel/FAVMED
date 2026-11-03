@@ -3,6 +3,7 @@
   const cloud = window.FAVMED_CLOUD;
   const client = cloud.client;
   const root = document.documentElement;
+  const localMode = !!window.FAVMED_LOCAL_MODE;
   const publicMode = new URLSearchParams(location.search).get("painel") === "1" ||
     location.pathname === "/sala" || location.pathname === "/sala/";
   let overlay = null;
@@ -79,6 +80,12 @@
     await cloud.readQueue({ publicMode });
     root.classList.remove("favmed-auth-checking");
     return true;
+  }
+
+  if (localMode) {
+    cloud.resolveAuth({ role: "local", active: true });
+    root.classList.remove("favmed-auth-checking");
+    return;
   }
 
   client.auth.onAuthStateChange((event) => {
