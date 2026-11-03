@@ -88,7 +88,7 @@
       showLogin("Conta sem perfil ativo. Solicite ao administrador a liberação do acesso.");
       return false;
     }
-    if (publicMode && !["master", "recepcao"].includes(profile.role)) {
+    if (publicMode && profile.role !== "recepcao") {
       showAccessMessage("A sala de espera deve ser aberta pela recepção. Volte à recepção e clique em “Abrir tela da sala de espera”.");
       return false;
     }
