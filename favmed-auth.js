@@ -76,6 +76,7 @@
       overlay = null;
     }
     cloud.resolveAuth(profile);
+    await cloud.readQueue({ publicMode });
     root.classList.remove("favmed-auth-checking");
     return true;
   }
