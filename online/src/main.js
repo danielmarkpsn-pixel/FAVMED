@@ -1120,7 +1120,10 @@ async function start() {
     await supabase.auth.signOut();
     return renderLogin('A conta não possui perfil autorizado ou está inativa.', true);
   }
-  if (profile.role === 'sala') return renderPublicWaitingRoom();
+  if (profile.role === 'sala') {
+    if (window.location.pathname !== '/sala') window.history.replaceState({}, document.title, '/sala');
+    return renderPublicWaitingRoom();
+  }
   const homePath = ({ master: '/master', recepcao: '/recepcao', profissional: '/profissional' })[profile.role];
   if (homePath && window.location.pathname === '/') window.history.replaceState({}, document.title, homePath);
   renderHome(profile, session.user.id);
