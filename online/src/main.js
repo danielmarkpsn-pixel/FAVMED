@@ -124,7 +124,10 @@ function renderLogin(message = '', isError = false) {
       }
       const homePath = ({ master: '/master', recepcao: '/recepcao', profissional: '/profissional', sala: '/sala' })[profile.role];
       window.history.replaceState({}, document.title, homePath);
-      if (profile.role === 'sala') return renderPublicWaitingRoom();
+      if (profile.role === 'sala') {
+    if (window.location.pathname !== '/sala') window.history.replaceState({}, document.title, '/sala');
+    return renderPublicWaitingRoom();
+  }
       renderHome(profile, data.user.id);
     } catch (error) {
       status.textContent = error.message || 'Falha ao validar o acesso.';
