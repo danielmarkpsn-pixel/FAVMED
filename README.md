@@ -43,3 +43,17 @@ Aplicativo local da Clínica Favmed para recepção, sala de espera e profission
 - A voz depende das vozes disponibilizadas pelo Chrome/Windows; voz feminina neural não é garantida.
 
 Crédito: Desenvolvido por Daniel Marques via IA.
+
+
+## Prévia web da interface local (Vercel)
+
+A branch `migration/favmed-local-parity` prepara uma prévia estática da interface original:
+
+- Recepção: `/`
+- Sala de espera: `/sala`
+- Painel profissional: `/consultorio`
+- Em hospedagem estática, a fila usa `localStorage` do navegador para permitir testar o fluxo entre páginas abertas no mesmo navegador.
+- Essa prévia **não sincroniza dados entre dispositivos**, não oferece autenticação e não deve ser usada para atendimentos reais. Upload de documentos e mídia depende de uma API ainda não portada.
+- No servidor PowerShell local, a aplicação continua usando as rotas locais existentes.
+
+A etapa seguinte é integrar a autenticação e a persistência compartilhada no Supabase, mantendo os arquivos originais da interface e respeitando as políticas RLS já existentes.
