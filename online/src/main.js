@@ -914,6 +914,7 @@ function renderHome(profile, userId) {
               <select id="new-role" name="role" required>
                 <option value="recepcao">Recepção</option>
                 <option value="profissional">Profissional</option>
+                <option value="sala">Sala de chamadas</option>
               </select>
               <button class="submit" id="create-user-submit" type="submit">Criar usuário</button>
               <p id="admin-message" class="message" role="status"></p>
@@ -1069,7 +1070,6 @@ async function renderPublicWaitingRoom() {
 }
 async function start() {
   if (!configured) return renderSetup();
-  if (window.location.pathname.replace(/\/+$/, '') === '/sala') return renderPublicWaitingRoom();
   // Supabase may return the flow type in the URL hash (implicit flow)
   // or the query string (depending on the email template / redirect setup).
   // Capture it before deciding whether an authenticated session may reach the panel.
