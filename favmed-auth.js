@@ -8,7 +8,26 @@
     location.pathname === "/sala" || location.pathname === "/sala/";
   let overlay = null;
 
+  function showAccessMessage(message) {
+    if (overlay) overlay.remove();
+    overlay = document.createElement("div");
+    overlay.className = "favmed-auth-overlay";
+    overlay.innerHTML = `
+      <section class="favmed-auth-card" aria-labelledby="favmed-auth-title">
+        <img src="/logo-favmed.png" alt="Clínica Favmed" class="favmed-auth-logo">
+        <h1 id="favmed-auth-title">Sala de espera</h1>
+        <p id="favmed-auth-info"></p>
+      </section>`;
+    document.body.appendChild(overlay);
+    overlay.querySelector("#favmed-auth-info").textContent = message;
+    root.classList.remove("favmed-auth-checking");
+  }
+
   function showLogin(message) {
+    if (publicMode) {
+      showAccessMessage("Abra esta tela pelo botão “Abrir tela da sala de espera” dentro do acesso da recepção.");
+      return;
+    }
     if (overlay) overlay.remove();
     overlay = document.createElement("div");
     overlay.className = "favmed-auth-overlay";
@@ -55,7 +74,8 @@
   async function validateSession() {
     const { data, error } = await client.auth.getUser();
     if (error || !data.user) {
-      showLogin("");
+      if (publicMode) showAccessMessage("Para exibir as chamadas, abra a sala de espera pelo botão disponível na recepção.");
+      else showLogin("");
       return false;
     }
     const { data: profile, error: profileError } = await client
@@ -68,8 +88,12 @@
       showLogin("Conta sem perfil ativo. Solicite ao administrador a liberação do acesso.");
       return false;
     }
+    if (publicMode && !["master", "recepcao"].includes(profile.role)) {
+      showAccessMessage("A sala de espera deve ser aberta pela recepção. Volte à recepção e clique em “Abrir tela da sala de espera”.");
+      return false;
+    }
     if (profile.role === "sala" && !publicMode) {
-      location.replace("/?painel=1");
+      showAccessMessage("A tela de chamadas deve ser aberta pela recepção.");
       return false;
     }
     if (overlay) {
