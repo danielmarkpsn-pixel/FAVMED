@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/consultorio",
+      "destination": "/consultorio.html"
+    },
+    {
+      "source": "/sala",
+      "destination": "/index.html?painel=1"
+    }
+  ]
+}
