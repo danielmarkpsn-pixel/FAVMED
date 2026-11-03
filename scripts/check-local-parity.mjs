@@ -44,4 +44,12 @@ if (!dailyMigration.includes("delete from public.visit_exams") || !dailyMigratio
   throw new Error("A limpeza inicial dos dados antigos não está registrada na migração.");
 }
 
+const waitingRoomMigration = readFileSync("online/supabase/migrations/20261103180000_reception_waiting_room_access.sql", "utf8");
+for (const required of ["v_role is null or v_role not in ('master', 'recepcao')", "security definer", "revoke all on function public.favmed_get_public_queue(text) from public, anon", "grant execute on function public.favmed_get_public_queue(text) to authenticated"]) {
+  if (!waitingRoomMigration.includes(required)) throw new Error("Acesso seguro da sala de espera ausente ou incompleto: " + required);
+}
+for (const required of ["showAccessMessage", "Abra esta tela pelo botão", '["master", "recepcao"].includes(profile.role)']) {
+  if (!auth.includes(required)) throw new Error("Fluxo da sala de espera pela recepção ausente: " + required);
+}
+
 console.log("FAVMED local parity checks passed.");
