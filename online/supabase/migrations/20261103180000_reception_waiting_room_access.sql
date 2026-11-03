@@ -18,7 +18,7 @@ begin
   from public.profiles p
   where p.id = auth.uid() and p.active = true;
 
-  if v_role not in ('master', 'recepcao') then
+  if v_role is null or v_role not in ('master', 'recepcao') then
     raise exception 'A tela de chamadas deve ser aberta pela recepção'
       using errcode = '42501';
   end if;
