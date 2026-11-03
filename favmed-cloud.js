@@ -72,11 +72,11 @@
         headers: {
           authorization: "Bearer " + data.session.access_token,
           apikey: SUPABASE_PUBLISHABLE_KEY,
-          "x-upsert": "false"
         },
         uploadDataDuringCreation: true,
         removeFingerprintOnSuccess: true,
         chunkSize: 6 * 1024 * 1024,
+        fingerprint: () => Promise.resolve(bucket + ":" + path),
         metadata: {
           bucketName: bucket,
           objectName: path,
