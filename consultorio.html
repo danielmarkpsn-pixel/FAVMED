@@ -9,6 +9,24 @@
 :root{color-scheme:light;--bg:#f3f6f8;--panel:#fff;--line:#dce5e9;--text:#20313a;--muted:#637984;--blue:#087f8c;--red:#b42332;--green:#137547}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 "Segoe UI",Arial,sans-serif}header{padding:20px clamp(16px,4vw,36px);background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.brand{display:flex;align-items:center;gap:12px}.brand img{width:48px;height:48px;object-fit:contain}.brand h1{font-size:20px;margin:0}.brand p{margin:3px 0 0;color:var(--muted);font-size:13px}main{max-width:1200px;margin:auto;padding:24px 16px}.top{display:flex;justify-content:space-between;gap:16px;align-items:end;flex-wrap:wrap;margin-bottom:18px}.top h2{font-size:30px;margin:0 0 4px}.top p{margin:0;color:var(--muted)}select,button{font:inherit;border-radius:10px;padding:11px 13px}select{border:1px solid #cbd9df;background:#fff;min-width:230px}.summary{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}.pill{padding:8px 12px;border:1px solid var(--line);background:#fff;border-radius:999px;font-size:12px;font-weight:750}.list{display:grid;gap:12px}.patient{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:center}.patient.attending-card{background:#fff0f0;border:2px solid #b42332;box-shadow:0 0 0 2px rgba(180,35,50,.08)}.patient.attending-card .name{color:#9d1c27}.patient.priority-card{border:2px solid #e9c66e;box-shadow:0 0 0 2px #fff0c2}.priority-flag{display:inline-block;margin-left:8px;padding:3px 7px;border-radius:5px;background:#fff0c2;color:#805600;font-size:10px;font-weight:900;vertical-align:middle}.patient.released-card{background:#f3f6f7;opacity:.72;padding:10px 14px}.patient.released-card .name{font-size:16px;color:#657780}.patient.released-card .meta{font-size:11px}.searchbar{display:flex;gap:8px;align-items:center;margin:0 0 14px}.searchbar input{width:100%;padding:11px 14px;border:1px solid #cbd9df;border-radius:10px;font:inherit}.name{font-size:20px;font-weight:850;overflow-wrap:anywhere}.meta{color:var(--muted);font-size:13px;margin-top:5px}.status{display:inline-block;margin-top:8px;padding:5px 9px;border-radius:999px;font-size:11px;font-weight:900;text-transform:uppercase;background:#e6f6f5;color:#526872}.status.attending{background:#fee4e2;color:#9d1c27}.status.released{background:#d9fbe7;color:#12663c}.actions{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}.btn{border:0;cursor:pointer;font-weight:800;font-size:13px}.actions a.btn{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;padding:11px 13px;line-height:1.2;min-height:40px}.blue{background:#087f8c;color:#fff}.red{background:#b42332;color:#fff}.green{background:#137547;color:#fff}.gray{background:#e7eef1;color:#253a43}.empty{padding:35px;text-align:center;background:#fff;border:1px dashed #cbd9df;border-radius:14px;color:var(--muted)}.note{font-size:12px;color:var(--muted);margin-top:18px}@media(max-width:650px){.patient{grid-template-columns:1fr}.actions{justify-content:stretch}.actions button{flex:1}.top h2{font-size:25px}}
 </style>
+
+<style>
+html.favmed-auth-checking body{visibility:hidden}
+.favmed-auth-overlay{position:fixed;inset:0;z-index:20000;display:grid;place-items:center;padding:18px;background:rgba(13,35,44,.78);font-family:"Segoe UI",Arial,sans-serif}
+.favmed-auth-card{width:min(420px,100%);background:#fff;border:1px solid #dce5e9;border-radius:16px;padding:28px;box-shadow:0 18px 60px #0004;color:#20313a}
+.favmed-auth-logo{display:block;width:56px;height:56px;object-fit:contain;margin:0 auto 12px}
+.favmed-auth-card h1{text-align:center;font-size:23px;margin:0 0 5px}
+.favmed-auth-card>p{text-align:center;color:#637984;margin:0 0 22px;font-size:13px}
+.favmed-auth-card label{display:block;font-size:12px;font-weight:700;color:#536a74;margin:12px 0 6px}
+.favmed-auth-card input{width:100%;padding:12px;border:1px solid #cbd9df;border-radius:10px;font:inherit;box-sizing:border-box}
+.favmed-auth-submit{width:100%;margin-top:18px;padding:12px;border:0;border-radius:10px;background:#087f8c;color:#fff;font-weight:800;font-size:14px;cursor:pointer}
+.favmed-auth-submit:disabled{opacity:.65;cursor:wait}
+.favmed-auth-message{min-height:18px;margin-top:12px;color:#b42332;font-size:12px;line-height:1.4}
+</style>
+<script>document.documentElement.classList.add("favmed-auth-checking");</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.81.1/dist/umd/supabase.min.js"></script>
+<script src="/favmed-cloud.js"></script>
+<script src="/favmed-auth.js" defer></script>
 </head>
 <body>
 <header><div class="brand"><img src="logo-favmed.png" alt="FAVMED"><div><h1>FAVMED</h1><p>Painel do profissional · Medicina Ocupacional</p></div></div></header>
@@ -26,8 +44,16 @@ const $=id=>document.getElementById(id);
 const QUEUE_KEY="favmed_local_queue_v1";
 const isLocalServer=location.hostname==="localhost"||location.hostname==="127.0.0.1"||/^192\.168\.|^10\.|^172\.(1[6-9]|2\d|3[01])\./.test(location.hostname);
 const serverMode=(location.protocol==="http:"||location.protocol==="https:")&&isLocalServer;
-async function readQueue(){if(serverMode){const r=await fetch("/api/state",{cache:"no-store"});if(!r.ok)throw Error("Não foi possível ler a fila.");const data=await r.json();return Array.isArray(data)?data:[];}try{const data=JSON.parse(localStorage.getItem(QUEUE_KEY)||"[]");return Array.isArray(data)?data:[];}catch(_){return [];}}
-async function writeQueue(list){if(serverMode){const r=await fetch("/api/state",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(list)});if(!r.ok)throw Error("Não foi possível salvar a alteração.");return;}localStorage.setItem(QUEUE_KEY,JSON.stringify(list));}
+async function readQueue(){
+ if(serverMode){const r=await fetch("/api/state",{cache:"no-store"});if(!r.ok)throw Error("Não foi possível ler a fila.");const data=await r.json();return Array.isArray(data)?data:[];}
+ if(window.FAVMED_CLOUD)return await window.FAVMED_CLOUD.readQueue({publicMode:false});
+ try{const data=JSON.parse(localStorage.getItem(QUEUE_KEY)||"[]");return Array.isArray(data)?data:[];}catch(_){return [];}
+}
+async function writeQueue(list){
+ if(serverMode){const r=await fetch("/api/state",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(list)});if(!r.ok)throw Error("Não foi possível salvar a alteração.");return;}
+ if(window.FAVMED_CLOUD){await window.FAVMED_CLOUD.writeQueue(list);return;}
+ localStorage.setItem(QUEUE_KEY,JSON.stringify(list));
+}
 const services=["RX","Coleta / laboratório","Audiometria","Exames complementares","ASO"];
 const ROOM_SERVICES={"Sala 1":"RX","Sala 2":"Coleta / laboratório","Sala 3":"Audiometria","Sala 4":"Exames complementares"};
 function roomLabel(room,service){const r=String(room||"").trim(),mapped=ROOM_SERVICES[r];if(r&&mapped&&(!service||service===mapped))return r+" - "+mapped;if(r&&service)return r+" - "+service;return r||service||"Sala não definida";}
