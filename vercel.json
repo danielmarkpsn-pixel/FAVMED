@@ -5,7 +5,15 @@
       "destination": "/consultorio.html"
     },
     {
+      "source": "/consultorio/",
+      "destination": "/consultorio.html"
+    },
+    {
       "source": "/sala",
+      "destination": "/index.html?painel=1"
+    },
+    {
+      "source": "/sala/",
       "destination": "/index.html?painel=1"
     }
   ]
