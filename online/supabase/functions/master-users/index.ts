@@ -1,7 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-// Production invitation destination is fixed to the canonical public application URL.
- // Never derive invitation redirects from localhost, request headers, or mutable secrets.
+// Invitations may return only to these exact application origins; arbitrary request origins are rejected.
 const productionAppUrl = "https://favmed.vercel.app";
 const previewAppUrl = "https://favmed-local-parity-preview-git-migration-fav-1107df-dan-markys.vercel.app";
 const allowedOrigins = new Set([productionAppUrl, previewAppUrl]);
