@@ -14,7 +14,7 @@ assert.doesNotMatch(edge, /Access-Control-Allow-Origin["']?\s*:\s*["']\*["']/);
 assert.match(edge, /requestOrigin !== allowedOrigin/);
 assert.match(edge, /auth\.getUser\(token\)/);
 assert.match(edge, /caller\.role !== "master" \|\| caller\.active !== true/);
-assert.match(edge, /new Set\(\["recepcao", "profissional"\]\)/);
+assert.match(edge, /new Set\(\["recepcao", "profissional", "sala"\]\)/);
 assert.match(edge, /INVITE_RATE_LIMITED/);
 assert.match(edge, /INVITE_EMAIL_EXISTS/);
 assert.match(edge, /set_active/);
@@ -74,9 +74,13 @@ const publicWaitingMigration = await readFile(new URL('../supabase/migrations/20
 assert.match(publicWaitingMigration, /create or replace view public\.public_waiting_room_calls/);
 assert.match(publicWaitingMigration, /grant select on public\.public_waiting_room_calls to anon/);
 assert.match(publicWaitingMigration, /revoke all on public\.public_waiting_room_calls from public, authenticated/);
+assert.match(publicWaitingMigration, /revoke all on public\.public_waiting_room_calls from public, authenticated/);
 assert.match(publicWaitingMigration, /v\.status = 'em_atendimento'/);
 const publicWaitingColumns = publicWaitingMigration.split('as\nselect')[1]?.split('\nfrom public.patient_visits')[0] || '';
 assert.doesNotMatch(publicWaitingColumns, /cpf|birth_date|company_name|exam_name/i);
+
+const salaAccessMigration = await readFile(new URL('../supabase/migrations/20261103153000_grant_authenticated_waiting_room_read.sql', import.meta.url), 'utf8');
+assert.match(salaAccessMigration, /grant select on public\.public_waiting_room_calls to authenticated/);
 
 const calledStatusMigration = await readFile(new URL('../supabase/migrations/20261029202000_visit_called_status.sql', import.meta.url), 'utf8');
 assert.match(calledStatusMigration, /'chamado'/);
