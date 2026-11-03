@@ -35,6 +35,7 @@ html.favmed-auth-checking body{visibility:hidden}
 </style>
 <script>document.documentElement.classList.add("favmed-auth-checking");</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.81.1/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tus-js-client@4.3.1/dist/tus.min.js"></script>
 <script src="/favmed-cloud.js"></script>
 <script src="/favmed-auth.js" defer></script>
 </head>
@@ -278,7 +279,7 @@ async function uploadSlideshowFiles(){
   if(file.size>524288000){notify(file.name+" excede 500 MB e foi ignorado.");continue;}
   if(status)status.textContent="Enviando "+file.name+" ("+(done+1)+"/"+files.length+")…";
   try{
-   if(window.FAVMED_CLOUD&&!serverMode) await window.FAVMED_CLOUD.uploadSlideshow(file);
+   if(window.FAVMED_CLOUD&&!serverMode) await window.FAVMED_CLOUD.uploadSlideshow(file,pct=>{if(status)status.textContent="Enviando "+file.name+": "+pct+"%";});
    else {const r=await fetch("/api/slideshow/upload?name="+encodeURIComponent(file.name),{method:"POST",headers:{"Content-Type":file.type||"application/octet-stream"},body:file});if(!r.ok)throw new Error("HTTP "+r.status);}
    done++;
   }catch(e){notify("Falha ao enviar "+file.name+": "+(e.message||"verifique a conexão."));}
