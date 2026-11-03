@@ -4,9 +4,11 @@ import vm from "node:vm";
 const htmlFiles = ["index.html", "consultorio.html", "importar-backup.html"];
 for (const file of htmlFiles) {
   const source = readFileSync(file, "utf8");
-  const scripts = [...source.matchAll(/<script\\b[^>]*>([\\s\\S]*?)<\\/script>/gi)]
-    .map(match => match[1])
-    .filter(code => code.trim());
+  const scripts = source.split("<script").slice(1).map(block => {
+    const openEnd = block.indexOf(">");
+    const closeStart = block.indexOf("</script>");
+    return openEnd >= 0 && closeStart >= 0 ? block.slice(openEnd + 1, closeStart) : "";
+  }).filter(code => code.trim());
   for (let index = 0; index < scripts.length; index += 1) {
     new vm.Script(scripts[index], { filename: file + "#script-" + index });
   }
