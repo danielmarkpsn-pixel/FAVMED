@@ -35,4 +35,13 @@ for (const feature of ["uploadPatientDocument", "listSlideshow", "uploadSlidesho
 if (reception.includes("dashboard-shell") || reception.includes("createRoot(")) {
   throw new Error("A interface reconstruída da pasta online não pode substituir a tela local.");
 }
+
+const dailyMigration = readFileSync("online/supabase/migrations/20261103153000_daily_queue_partition_and_cleanup.sql", "utf8");
+for (const required of ["favmed_queue_days", "America/Manaus", "favmed_daily_cleanup", "33554432", "favmed-daily-reset"]) {
+  if (!dailyMigration.includes(required)) throw new Error("Rotina diária ausente ou incompleta: " + required);
+}
+if (!dailyMigration.includes("delete from public.visit_exams") || !dailyMigration.includes("delete from public.patient_visits") || !dailyMigration.includes("delete from public.patients")) {
+  throw new Error("A limpeza inicial dos dados antigos não está registrada na migração.");
+}
+
 console.log("FAVMED local parity checks passed.");
