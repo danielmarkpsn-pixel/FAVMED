@@ -11,7 +11,7 @@ const [edge, frontend, queueFile] = await Promise.all([
 // These checks complement (but do not replace) live Supabase RLS/integration tests.
 assert.match(edge, /Access-Control-Allow-Origin["']?\s*:\s*allowedOrigin/);
 assert.doesNotMatch(edge, /Access-Control-Allow-Origin["']?\s*:\s*["']\*["']/);
-assert.match(edge, /requestOrigin !== allowedOrigin/);
+assert.match(edge, /!allowedOrigins\.has\(requestOrigin\)/);
 assert.match(edge, /auth\.getUser\(token\)/);
 assert.match(edge, /caller\.role !== "master" \|\| caller\.active !== true/);
 assert.match(edge, /new Set\(\["recepcao", "profissional", "sala"\]\)/);
