@@ -23,7 +23,12 @@ html.favmed-auth-checking body{visibility:hidden}
 .favmed-auth-submit:disabled{opacity:.65;cursor:wait}
 .favmed-auth-message{min-height:18px;margin-top:12px;color:#b42332;font-size:12px;line-height:1.4}
 </style>
-<script>document.documentElement.classList.add("favmed-auth-checking");</script>
+<script>(function(){
+ const h=location.hostname.toLowerCase();
+ window.FAVMED_LOCAL_MODE=location.protocol==="file:"||h==="localhost"||h==="127.0.0.1"||h==="::1"||
+  /^10\./.test(h)||/^192\.168\./.test(h)||/^172\.(1[6-9]|2\d|3[01])\./.test(h)||h.endsWith(".local");
+ if(!window.FAVMED_LOCAL_MODE)document.documentElement.classList.add("favmed-auth-checking");
+})();</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.81.1/dist/umd/supabase.min.js"></script>
 <script src="/favmed-cloud.js"></script>
 <script src="/favmed-auth.js" defer></script>
@@ -46,12 +51,12 @@ const isLocalServer=location.hostname==="localhost"||location.hostname==="127.0.
 const serverMode=(location.protocol==="http:"||location.protocol==="https:")&&isLocalServer;
 async function readQueue(){
  if(serverMode){const r=await fetch("/api/state",{cache:"no-store"});if(!r.ok)throw Error("Não foi possível ler a fila.");const data=await r.json();return Array.isArray(data)?data:[];}
- if(window.FAVMED_CLOUD)return await window.FAVMED_CLOUD.readQueue({publicMode:false});
+ if(window.FAVMED_CLOUD&&!window.FAVMED_LOCAL_MODE)return await window.FAVMED_CLOUD.readQueue({publicMode:false});
  try{const data=JSON.parse(localStorage.getItem(QUEUE_KEY)||"[]");return Array.isArray(data)?data:[];}catch(_){return [];}
 }
 async function writeQueue(list){
  if(serverMode){const r=await fetch("/api/state",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(list)});if(!r.ok)throw Error("Não foi possível salvar a alteração.");return;}
- if(window.FAVMED_CLOUD){await window.FAVMED_CLOUD.writeQueue(list);return;}
+ if(window.FAVMED_CLOUD&&!window.FAVMED_LOCAL_MODE){await window.FAVMED_CLOUD.writeQueue(list);return;}
  localStorage.setItem(QUEUE_KEY,JSON.stringify(list));
 }
 const services=["RX","Coleta / laboratório","Audiometria","Exames complementares","ASO"];
