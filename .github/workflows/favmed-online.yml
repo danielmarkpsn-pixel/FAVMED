@@ -9,6 +9,20 @@ on:
     paths:
       - "online/**"
       - "fila.json"
+      - "index.html"
+      - "consultorio.html"
+      - "favmed-*.js"
+      - "importar-backup.html"
+      - "consultorio/**"
+      - "sala/**"
+      - "scripts/check-local-parity.mjs"
+      - "index.html"
+      - "consultorio.html"
+      - "favmed-*.js"
+      - "importar-backup.html"
+      - "consultorio/**"
+      - "sala/**"
+      - "scripts/check-local-parity.mjs"
       - ".github/workflows/favmed-online.yml"
   pull_request:
     paths:
@@ -46,3 +60,19 @@ jobs:
         run: deno check --no-lock supabase/functions/master-users/index.ts
       - name: Build application
         run: npm run build
+
+  check-local-mode:
+    name: Verify original local interface and cloud adapter
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check local interface parity and JavaScript syntax
+        run: |
+          node scripts/check-local-parity.mjs
+          node --check favmed-cloud.js
+          node --check favmed-auth.js
