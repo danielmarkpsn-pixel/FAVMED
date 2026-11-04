@@ -24,10 +24,6 @@
   }
 
   function showLogin(message) {
-    if (publicMode) {
-      showAccessMessage("Abra esta tela pelo botão “Abrir tela da sala de espera” dentro do acesso da recepção.");
-      return;
-    }
     if (overlay) overlay.remove();
     overlay = document.createElement("div");
     overlay.className = "favmed-auth-overlay";
@@ -71,6 +67,27 @@
     });
   }
 
+  function addLogoutButton() {
+    if (document.getElementById("favmed-logout")) return;
+    const button = document.createElement("button");
+    button.id = "favmed-logout";
+    button.type = "button";
+    button.textContent = "Sair da conta";
+    button.setAttribute("aria-label", "Sair da conta");
+    button.style.cssText = "position:fixed;right:18px;bottom:18px;z-index:9998;border:0;border-radius:10px;padding:11px 16px;background:#20313a;color:#fff;font:700 13px Segoe UI,Arial,sans-serif;box-shadow:0 4px 16px #0002;cursor:pointer";
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      button.textContent = "Saindo...";
+      const { error } = await client.auth.signOut();
+      if (error) {
+        button.disabled = false;
+        button.textContent = "Sair da conta";
+        alert("Não foi possível encerrar a sessão: " + (error.message || "tente novamente."));
+      }
+    });
+    document.body.appendChild(button);
+  }
+
   async function validateSession() {
     const { data, error } = await client.auth.getUser();
     if (error || !data.user) {
@@ -88,20 +105,15 @@
       showLogin("Conta sem perfil ativo. Solicite ao administrador a liberação do acesso.");
       return false;
     }
-    if (publicMode && profile.role !== "recepcao") {
-      showAccessMessage("A sala de espera deve ser aberta pela recepção. Volte à recepção e clique em “Abrir tela da sala de espera”.");
-      return false;
-    }
-    if (profile.role === "sala" && !publicMode) {
-      showAccessMessage("A tela de chamadas deve ser aberta pela recepção.");
-      return false;
-    }
+    // Na versão Preview, qualquer perfil ativo pode entrar nos módulos.
+    // As permissões específicas continuam sendo aplicadas pelas operações protegidas no backend.
     if (overlay) {
       overlay.remove();
       overlay = null;
     }
     cloud.resolveAuth(profile);
     await cloud.readQueue({ publicMode });
+    addLogoutButton();
     root.classList.remove("favmed-auth-checking");
     return true;
   }
