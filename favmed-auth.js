@@ -4,9 +4,16 @@
   const client = cloud.client;
   const root = document.documentElement;
   const localMode = !!window.FAVMED_LOCAL_MODE;
-  const publicMode = new URLSearchParams(location.search).get("painel") === "1" ||
-    location.pathname === "/sala" || location.pathname === "/sala/";
+  const params = new URLSearchParams(location.search);
+  const publicMode = params.get("painel") === "1" || location.pathname === "/sala" || location.pathname === "/sala/";
+  const hashParams = new URLSearchParams(location.hash.replace(/^#/, ""));
+  const authFlow = hashParams.get("type") || params.get("flow") || "";
   let overlay = null;
+
+  function cleanAuthUrl() {
+    const clean = location.pathname + location.search;
+    history.replaceState({}, document.title, clean);
+  }
 
   function showAccessMessage(message) {
     if (overlay) overlay.remove();
@@ -21,6 +28,103 @@
     document.body.appendChild(overlay);
     overlay.querySelector("#favmed-auth-info").textContent = message;
     root.classList.remove("favmed-auth-checking");
+  }
+
+  function showPasswordSetup(message) {
+    if (overlay) overlay.remove();
+    overlay = document.createElement("div");
+    overlay.className = "favmed-auth-overlay";
+    overlay.innerHTML = `
+      <section class="favmed-auth-card" aria-labelledby="favmed-auth-title">
+        <img src="/logo-favmed.png" alt="Clínica Favmed" class="favmed-auth-logo">
+        <h1 id="favmed-auth-title">Definir senha</h1>
+        <p>Crie uma senha para acessar o FAVMED. Use pelo menos 8 caracteres.</p>
+        <form id="favmed-password-form">
+          <label for="favmed-new-password">Nova senha</label>
+          <input id="favmed-new-password" name="password" type="password" autocomplete="new-password" minlength="8" required>
+          <label for="favmed-confirm-password">Confirmar senha</label>
+          <input id="favmed-confirm-password" name="confirm" type="password" autocomplete="new-password" minlength="8" required>
+          <button type="submit" class="favmed-auth-submit">Salvar senha</button>
+          <div class="favmed-auth-message" id="favmed-password-message" role="alert"></div>
+        </form>
+      </section>`;
+    document.body.appendChild(overlay);
+    root.classList.remove("favmed-auth-checking");
+    const form = overlay.querySelector("#favmed-password-form");
+    const messageBox = overlay.querySelector("#favmed-password-message");
+    if (message) messageBox.textContent = message;
+    form.addEventListener("submit", async event => {
+      event.preventDefault();
+      const button = form.querySelector("button");
+      const password = form.elements.password.value;
+      if (password.length < 8) {
+        messageBox.textContent = "A senha deve ter pelo menos 8 caracteres.";
+        return;
+      }
+      if (password !== form.elements.confirm.value) {
+        messageBox.textContent = "As senhas não coincidem.";
+        return;
+      }
+      button.disabled = true;
+      button.textContent = "Salvando...";
+      messageBox.textContent = "";
+      try {
+        const { error } = await client.auth.updateUser({ password });
+        if (error) throw error;
+        await client.auth.signOut();
+        cleanAuthUrl();
+        showLogin("Senha criada com sucesso. Entre com seu e-mail e a nova senha.");
+      } catch (error) {
+        messageBox.textContent = error.message || "Não foi possível salvar a senha. Abra novamente o link recebido por e-mail.";
+      } finally {
+        button.disabled = false;
+        button.textContent = "Salvar senha";
+      }
+    });
+  }
+
+  function showRecovery(message) {
+    if (overlay) overlay.remove();
+    overlay = document.createElement("div");
+    overlay.className = "favmed-auth-overlay";
+    overlay.innerHTML = `
+      <section class="favmed-auth-card" aria-labelledby="favmed-auth-title">
+        <img src="/logo-favmed.png" alt="Clínica Favmed" class="favmed-auth-logo">
+        <h1 id="favmed-auth-title">Esqueci a senha</h1>
+        <p>Informe seu e-mail. Enviaremos um link para criar uma nova senha.</p>
+        <form id="favmed-recovery-form">
+          <label for="favmed-recovery-email">E-mail</label>
+          <input id="favmed-recovery-email" name="email" type="email" autocomplete="username" required>
+          <button type="submit" class="favmed-auth-submit">Enviar link</button>
+          <button type="button" id="favmed-back-login" class="favmed-auth-submit" style="margin-top:8px;background:#647780">Voltar ao login</button>
+          <div class="favmed-auth-message" id="favmed-recovery-message" role="alert"></div>
+        </form>
+      </section>`;
+    document.body.appendChild(overlay);
+    root.classList.remove("favmed-auth-checking");
+    const form = overlay.querySelector("#favmed-recovery-form");
+    const messageBox = overlay.querySelector("#favmed-recovery-message");
+    if (message) messageBox.textContent = message;
+    overlay.querySelector("#favmed-back-login").addEventListener("click", () => showLogin(""));
+    form.addEventListener("submit", async event => {
+      event.preventDefault();
+      const button = form.querySelector('button[type="submit"]');
+      button.disabled = true;
+      button.textContent = "Enviando...";
+      messageBox.textContent = "";
+      try {
+        const email = form.elements.email.value.trim();
+        const redirectTo = location.origin + location.pathname + "?flow=recovery";
+        const { error } = await client.auth.resetPasswordForEmail(email, { redirectTo });
+        if (error) throw error;
+        messageBox.textContent = "Se o e-mail estiver cadastrado, você receberá um link para definir uma nova senha.";
+      } catch (error) {
+        messageBox.textContent = error.message || "Não foi possível enviar o link. Tente novamente.";
+      } finally {
+        button.disabled = false;
+        button.textContent = "Enviar link";
+      }
+    });
   }
 
   function showLogin(message) {
@@ -38,6 +142,7 @@
           <label for="favmed-auth-password">Senha</label>
           <input id="favmed-auth-password" name="password" type="password" autocomplete="current-password" required>
           <button type="submit" class="favmed-auth-submit">Entrar</button>
+          <button type="button" id="favmed-forgot-password" class="favmed-auth-submit" style="margin-top:8px;background:#647780">Esqueci a senha</button>
           <div class="favmed-auth-message" id="favmed-auth-message" role="alert"></div>
         </form>
       </section>`;
@@ -45,9 +150,10 @@
     root.classList.remove("favmed-auth-checking");
     if (message) overlay.querySelector("#favmed-auth-message").textContent = message;
     const form = overlay.querySelector("#favmed-auth-form");
+    overlay.querySelector("#favmed-forgot-password").addEventListener("click", () => showRecovery(""));
     form.addEventListener("submit", async event => {
       event.preventDefault();
-      const button = form.querySelector("button");
+      const button = form.querySelector('button[type="submit"]');
       const messageBox = form.querySelector("#favmed-auth-message");
       const email = form.elements.email.value.trim();
       const password = form.elements.password.value;
@@ -115,8 +221,6 @@
       showLogin("Conta sem perfil ativo. Solicite ao administrador a liberação do acesso.");
       return false;
     }
-    // Na versão Preview, qualquer perfil ativo pode entrar nos módulos.
-    // As permissões específicas continuam sendo aplicadas pelas operações protegidas no backend.
     if (overlay) {
       overlay.remove();
       overlay = null;
@@ -135,9 +239,13 @@
   }
 
   if (publicMode) {
-    // A tela pública da sala usa RPC limitado e não exige conta autenticada.
     cloud.resolveAuth({ role: "sala", active: true, public: true });
     root.classList.remove("favmed-auth-checking");
+    return;
+  }
+
+  if (authFlow === "invite" || authFlow === "recovery" || authFlow === "signup") {
+    showPasswordSetup(authFlow === "invite" ? "Defina sua senha para ativar o acesso." : "Defina sua nova senha.");
     return;
   }
 
