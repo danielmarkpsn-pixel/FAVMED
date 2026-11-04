@@ -124,6 +124,13 @@
     return;
   }
 
+  if (publicMode) {
+    // A tela pública da sala usa RPC limitado e não exige conta autenticada.
+    cloud.resolveAuth({ role: "sala", active: true, public: true });
+    root.classList.remove("favmed-auth-checking");
+    return;
+  }
+
   client.auth.onAuthStateChange((event) => {
     if (event === "SIGNED_OUT") location.reload();
   });
