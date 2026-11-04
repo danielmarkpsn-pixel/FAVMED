@@ -69,6 +69,16 @@
 
   function addLogoutButton() {
     if (document.getElementById("favmed-logout")) return;
+    const profile = cloud.profile;
+    if (profile && profile.role === "master" && !publicMode && !document.getElementById("favmed-admin-logins")) {
+      const adminButton = document.createElement("a");
+      adminButton.id = "favmed-admin-logins";
+      adminButton.href = "/admin-logins.html";
+      adminButton.textContent = "Administrar logins";
+      adminButton.setAttribute("aria-label", "Abrir administração de logins");
+      adminButton.style.cssText = "position:fixed;right:154px;bottom:18px;z-index:9998;border:0;border-radius:10px;padding:11px 16px;background:#087f8c;color:#fff;text-decoration:none;font:700 13px Segoe UI,Arial,sans-serif;box-shadow:0 4px 16px #0002;cursor:pointer";
+      document.body.appendChild(adminButton);
+    }
     const button = document.createElement("button");
     button.id = "favmed-logout";
     button.type = "button";
