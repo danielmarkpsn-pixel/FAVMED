@@ -98,6 +98,7 @@ html.favmed-auth-checking body{visibility:hidden}
 "use strict";
 const KEY="favmed_local_queue_v1";
 const publicMode=new URLSearchParams(location.search).get("painel")==="1"||location.pathname==="/sala"||location.pathname==="/sala/";
+const publicRoomFilter=(new URLSearchParams(location.search).get("room")||"").trim();
 const isLocalServer=location.hostname==="localhost"||location.hostname==="127.0.0.1"||/^192\.168\.|^10\.|^172\.(1[6-9]|2\d|3[01])\./.test(location.hostname);
 const serverMode=(location.protocol==="http:"||location.protocol==="https:")&&isLocalServer;
 let patients=[];
@@ -115,7 +116,7 @@ let slideshowActive=false;
 let slideshowTimer=null;
 const $=id=>document.getElementById(id);
 const todayKey=new Date().getFullYear()+"-"+String(new Date().getMonth()+1).padStart(2,"0")+"-"+String(new Date().getDate()).padStart(2,"0");
-if(publicMode){document.body.classList.add("public-mode");document.title="Clínica Favmed - Medicina Ocupacional | Sala de espera";}
+if(publicMode){document.body.classList.add("public-mode");document.title="Clínica Favmed - Medicina Ocupacional | Sala de espera"+(publicRoomFilter?" | "+publicRoomFilter:"");const label=document.querySelector(".public-screen .screen-label");if(label&&publicRoomFilter)label.textContent="CLÍNICA FAVMED · "+publicRoomFilter.toLocaleUpperCase("pt-BR");}
 $("today").textContent=new Date().toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"long",year:"numeric"});
 async function load(){
  if(serverMode){if(saveInProgress>0)return;try{const r=await fetch("/api/state",{cache:"no-store"});if(!r.ok)throw new Error("HTTP "+r.status);const data=await r.json();if(saveInProgress===0)patients=Array.isArray(data)?data:[];}catch(e){notify("Sem conexão com o servidor local. Confira se o computador da recepção está ligado.");}return;}
@@ -346,11 +347,11 @@ function unlockCallAudio(){
 
 function renderPublic(){
  const today=patients.filter(p=>p.day===todayKey);
- const called=today.flatMap(p=>[...activeCallsFor(p),...(p.receptionCall&&p.receptionCall.status==="Chamado"?[{p,service:p.receptionCall.service,state:p.receptionCall}]:[])]).sort((a,b)=>(a.state.updatedAt||0)-(b.state.updatedAt||0));
+ const called=today.flatMap(p=>[...activeCallsFor(p).filter(item=>!publicRoomFilter||roomForService(p,item.service)===publicRoomFilter),...(p.receptionCall&&p.receptionCall.status==="Chamado"?[{p,service:p.receptionCall.service,state:p.receptionCall}]:[])]).sort((a,b)=>(a.state.updatedAt||0)-(b.state.updatedAt||0));
  updateSlideshowIdle();
  const box=$("calledDisplay");
  if(box)box.innerHTML=called.length?called.map(item=>'<article class="called-card'+(item.state.status==="Atendendo"?" attending":item.state.status==="Chamado"?" blinking":"")+'"><div class="call-label">'+(item.state.status==="Atendendo"?"EM ATENDIMENTO":"PACIENTE CHAMADO")+'</div><div class="call-name">'+esc(String(item.p.name||"").toLocaleUpperCase("pt-BR"))+'</div><div class="call-room">➜ '+esc(roomForService(item.p,item.service)||item.state.callLabel||item.service)+'</div></article>').join(''):'<div class="no-calls"><strong>Aguardando próxima chamada</strong>Por favor, aguarde. Seu nome será anunciado aqui.</div>';
- const q=$("publicQueueList");if(q){const waiting=today.filter(p=>p.status!=="Atendido"&&!activeState(p)).sort((a,b)=>(Number(!!b.priority)-Number(!!a.priority))||(a.created||0)-(b.created||0)).slice(0,8);q.innerHTML=waiting.length?waiting.map((p,i)=>'<div class="queue-person"><strong>'+esc(String(p.name||"").toLocaleUpperCase("pt-BR"))+'</strong><span>Posição '+(i+1)+' · '+esc(p.room||"Sala a definir")+'</span></div>').join(""):'<div class="queue-person"><span>Não há outros pacientes aguardando.</span></div>';}
+ const q=$("publicQueueList");if(q){const waiting=today.filter(p=>p.status!=="Atendido"&&!activeState(p)&&(!publicRoomFilter||roomsOf(p).includes(publicRoomFilter))).sort((a,b)=>(Number(!!b.priority)-Number(!!a.priority))||(a.created||0)-(b.created||0)).slice(0,8);q.innerHTML=waiting.length?waiting.map((p,i)=>'<div class="queue-person"><strong>'+esc(String(p.name||"").toLocaleUpperCase("pt-BR"))+'</strong><span>Posição '+(i+1)+' · '+esc(p.room||"Sala a definir")+'</span></div>').join(""):'<div class="queue-person"><span>Não há outros pacientes aguardando.</span></div>';}
  for(const item of called){if(item.state.status!=="Chamado")continue;const p=item.p,key=String(p.id)+"-"+String(item.state.updatedAt||p.created)+"-"+item.service;if(announcedPublicCallKeys.has(key))continue;announcedPublicCallKeys.add(key);lastPublicAnnouncementKey=key;playCallSignal();}
 }
 function voiceLooksFeminine(v){return /female|feminina|maria|francisca|luciana|camila|helena|samantha|joana|vitoria|vit[oó]ria|sofia|sophia|fernanda|bruna|leticia|letícia|raquel|manuela/i.test(v.name||"");}
