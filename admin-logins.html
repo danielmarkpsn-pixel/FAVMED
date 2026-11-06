@@ -13,14 +13,14 @@ h1{font-size:21px;margin:0}header p{margin:3px 0 0;color:var(--muted);font-size:
 a,.btn{display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:9px;padding:10px 14px;background:var(--teal);color:white;text-decoration:none;font:700 13px "Segoe UI",Arial;cursor:pointer}
 main{max-width:1000px;margin:28px auto;padding:0 16px 40px}.panel{background:#fff;border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:18px;box-shadow:0 5px 18px #1b3a4408}
 h2{font-size:18px;margin:0 0 5px}.sub{margin:0 0 16px;color:var(--muted);font-size:13px}
-form{display:grid;grid-template-columns:1fr 1fr auto;gap:12px;align-items:end}
+form{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:12px;align-items:end}
 label{display:block;font-size:12px;font-weight:700;color:#536a74;margin-bottom:6px}
-input{width:100%;padding:11px;border:1px solid #cbd9df;border-radius:9px;font:inherit}
+input,select{width:100%;padding:11px;border:1px solid #cbd9df;border-radius:9px;background:#fff;font:inherit}
 button:disabled{opacity:.55;cursor:wait}
 table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:11px 9px;border-bottom:1px solid var(--line);font-size:13px}th{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px}
 .status{font-weight:700}.active{color:#16734a}.inactive{color:var(--red)}.small{padding:7px 10px;font-size:12px;background:#e7eef1;color:#253a43}
 #message{min-height:20px;margin-top:12px;font-size:13px;color:var(--red)}#message.ok{color:#16734a}
-@media(max-width:680px){form{grid-template-columns:1fr}.panel{padding:15px}table{display:block;overflow-x:auto;white-space:nowrap}}
+@media(max-width:900px){form{grid-template-columns:1fr 1fr}}@media(max-width:680px){form{grid-template-columns:1fr}.panel{padding:15px}table{display:block;overflow-x:auto;white-space:nowrap}}
 </style>
 </head>
 <body>
@@ -32,6 +32,7 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:11px 9px
 <form id="create-form">
 <div><label for="display-name">Nome do usuário</label><input id="display-name" name="display_name" maxlength="120" required></div>
 <div><label for="email">E-mail</label><input id="email" name="email" type="email" maxlength="254" required></div>
+<div><label for="role">Função</label><select id="role" name="role" required><option value="">Selecione a função</option><option value="recepcao">Recepção</option><option value="profissional">Profissional</option></select></div>
 <button class="btn" id="create-button" type="submit">Criar login</button>
 </form>
 <div id="message" role="status" aria-live="polite"></div>
@@ -55,20 +56,47 @@ async function adminCall(body){
  if(data&&data.error)throw new Error(data.error);
  return data;
 }
+function roleLabel(role){
+ return role==="recepcao"?"Recepção":role==="profissional"?"Profissional":role==="master"?"Master":role==="sala"?"Sala (legado)":role||"—";
+}
 function renderUsers(users){
  if(!users.length){usersContainer.textContent="Nenhum login cadastrado.";return;}
  const table=document.createElement("table");
- table.innerHTML="<thead><tr><th>Nome</th><th>Perfil interno</th><th>Status</th><th>Ação</th></tr></thead><tbody></tbody>";
+ table.innerHTML="<thead><tr><th>Nome</th><th>Função</th><th>Status</th><th>Ação</th></tr></thead><tbody></tbody>";
  const tbody=table.querySelector("tbody");
  users.forEach(user=>{
   const tr=document.createElement("tr");
   const name=document.createElement("td");name.textContent=user.display_name||"—";
-  const role=document.createElement("td");role.textContent=user.role||"—";
+  const role=document.createElement("td");
+  if(user.role==="master"){
+   role.textContent=roleLabel(user.role);
+  }else{
+   const select=document.createElement("select");
+   select.setAttribute("aria-label","Função de "+(user.display_name||"usuário"));
+   select.style.cssText="min-width:140px;padding:7px;border:1px solid #cbd9df;border-radius:8px;background:#fff";
+   const current=document.createElement("option");current.value=user.role||"";current.textContent=roleLabel(user.role);current.selected=true;select.appendChild(current);
+   ["recepcao","profissional"].filter(value=>value!==user.role).forEach(value=>{
+    const option=document.createElement("option");option.value=value;option.textContent=roleLabel(value);select.appendChild(option);
+   });
+   const save=document.createElement("button");save.type="button";save.className="btn small";save.textContent="Salvar função";save.style.marginLeft="6px";
+   save.addEventListener("click",async()=>{
+    if(select.value===user.role)return;
+    save.disabled=true;
+    try{await adminCall({action:"set_role",user_id:user.id,role:select.value});await loadUsers();showMessage("Função de "+(user.display_name||"usuário")+" alterada para "+roleLabel(select.value)+".",true);}
+    catch(error){showMessage(error.message);}
+    finally{save.disabled=false;}
+   });
+   role.append(select,save);
+  }
   const status=document.createElement("td");status.textContent=user.active?"Ativo":"Bloqueado";status.className="status "+(user.active?"active":"inactive");
-  const action=document.createElement("td"),button=document.createElement("button");
-  button.type="button";button.className="btn small";button.textContent=user.active?"Bloquear":"Reativar";
-  button.addEventListener("click",async()=>{button.disabled=true;try{await adminCall({action:"set_active",user_id:user.id,active:!user.active});await loadUsers();showMessage("Status da conta atualizado.",true);}catch(error){showMessage(error.message);}finally{button.disabled=false;}});
-  action.appendChild(button);tr.append(name,role,status,action);tbody.appendChild(tr);
+  const action=document.createElement("td");
+  if(user.role==="master"){action.textContent="Protegido";}
+  else{
+   const button=document.createElement("button");button.type="button";button.className="btn small";button.textContent=user.active?"Bloquear":"Reativar";
+   button.addEventListener("click",async()=>{button.disabled=true;try{await adminCall({action:"set_active",user_id:user.id,active:!user.active});await loadUsers();showMessage("Status da conta atualizado.",true);}catch(error){showMessage(error.message);}finally{button.disabled=false;}});
+   action.appendChild(button);
+  }
+  tr.append(name,role,status,action);tbody.appendChild(tr);
  });
  usersContainer.replaceChildren(table);
 }
@@ -76,7 +104,9 @@ async function loadUsers(){usersContainer.textContent="Carregando usuários…";
 form.addEventListener("submit",async event=>{
  event.preventDefault();createButton.disabled=true;createButton.textContent="Enviando convite…";showMessage("");
  try{
-  const data=await adminCall({action:"create_user",display_name:form.elements.display_name.value.trim(),email:form.elements.email.value.trim(),role:"profissional"});
+  const selectedRole=form.elements.role.value;
+  if(!["recepcao","profissional"].includes(selectedRole))throw new Error("Selecione Recepção ou Profissional.");
+  const data=await adminCall({action:"create_user",display_name:form.elements.display_name.value.trim(),email:form.elements.email.value.trim(),role:selectedRole});
   form.reset();await loadUsers();showMessage("Login criado. Convite enviado para "+data.user.email+".",true);
  }catch(error){showMessage(error.message);}
  finally{createButton.disabled=false;createButton.textContent="Criar login";}
