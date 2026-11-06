@@ -177,6 +177,30 @@ Deno.serve(async (req: Request) => {
     return respond({ user: { id: created.user.id, email, display_name: displayName, role, active: true } }, 201);
   }
 
+  if (body.action === "set_role") {
+    const targetId = typeof body.user_id === "string" ? body.user_id : "";
+    const role = typeof body.role === "string" ? body.role : "";
+    if (!targetId || !allowedRoles.has(role)) {
+      return respond({ error: "Informe um usuário e uma função válida." }, 400);
+    }
+    const { data: target, error: targetError } = await admin
+      .from("profiles")
+      .select("id, role")
+      .eq("id", targetId)
+      .maybeSingle();
+    if (targetError) return respond({ error: "Não foi possível localizar o perfil." }, 500);
+    if (!target) return respond({ error: "Perfil não encontrado." }, 404);
+    if (target.role === "master") {
+      return respond({ error: "A função do Administrador Master é protegida." }, 403);
+    }
+    const { error: updateError } = await admin
+      .from("profiles")
+      .update({ role, updated_at: new Date().toISOString() })
+      .eq("id", targetId);
+    if (updateError) return respond({ error: "Não foi possível atualizar a função do usuário." }, 500);
+    return respond({ user_id: targetId, role });
+  }
+
   if (body.action === "set_active") {
     const targetId = typeof body.user_id === "string" ? body.user_id : "";
     const active = body.active;
