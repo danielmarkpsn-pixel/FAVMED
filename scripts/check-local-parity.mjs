@@ -48,8 +48,32 @@ const waitingRoomMigration = readFileSync("online/supabase/migrations/2026110318
 for (const required of ["v_role is null or v_role not in ('master', 'recepcao')", "security definer", "revoke all on function public.favmed_get_public_queue(text) from public, anon", "grant execute on function public.favmed_get_public_queue(text) to authenticated"]) {
   if (!waitingRoomMigration.includes(required)) throw new Error("Acesso seguro da sala de espera ausente ou incompleto: " + required);
 }
-for (const required of ["showAccessMessage", "Abra esta tela pelo botão", '["master", "recepcao"].includes(profile.role)']) {
-  if (!auth.includes(required)) throw new Error("Fluxo da sala de espera pela recepção ausente: " + required);
+for (const required of [
+  'if (publicMode) {',
+  'role: "public_display"',
+  'cloud.resolveAuth({ role: "public_display", active: true })'
+]) {
+  if (!auth.includes(required)) throw new Error("A sala de espera deve abrir sem login: " + required);
+}
+for (const required of [
+  'const publicClient = window.supabase.createClient',
+  'persistSession: false',
+  'publicClient.rpc("favmed_get_public_queue"'
+]) {
+  if (!cloud.includes(required)) throw new Error("A leitura pública isolada da fila está ausente: " + required);
+}
+const publicDisplayMigration = readFileSync("online/supabase/migrations/20261106163834_public_waiting_room_display.sql", "utf8");
+for (const required of [
+  "if auth.uid() is not null then",
+  "grant execute on function public.favmed_get_public_queue(text) to anon, authenticated",
+  "p_day <> v_today::text",
+  "'name', p.value->'name'",
+  "'room', p.value->'room'"
+]) {
+  if (!publicDisplayMigration.includes(required)) throw new Error("Acesso público limitado da sala de espera ausente: " + required);
+}
+for (const forbidden of ["'cpf'", "'birthDate'", "'insurance'", "'document'"]) {
+  if (publicDisplayMigration.includes(forbidden)) throw new Error("A fila pública não pode expor dados pessoais: " + forbidden);
 }
 
 console.log("FAVMED local parity checks passed.");
