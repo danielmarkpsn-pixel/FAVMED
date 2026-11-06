@@ -242,6 +242,14 @@
     return;
   }
 
+  // The hallway display is intentionally public and read-only. It uses a
+  // separate anonymous Supabase client and never inherits a staff session.
+  if (publicMode) {
+    cloud.resolveAuth({ role: "public_display", active: true });
+    root.classList.remove("favmed-auth-checking");
+    return;
+  }
+
   if (authFlow === "invite" || authFlow === "recovery" || authFlow === "signup") {
     showPasswordSetup(authFlow === "invite" ? "Defina sua senha para ativar o acesso." : "Defina sua nova senha.");
     return;
