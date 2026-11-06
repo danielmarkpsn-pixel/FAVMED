@@ -207,7 +207,7 @@
   async function validateSession() {
     const { data, error } = await client.auth.getUser();
     if (error || !data.user) {
-      if (publicMode) showAccessMessage("Para exibir as chamadas, abra a sala de espera pelo botão disponível na recepção.");
+      if (publicMode) showAccessMessage("Abra esta tela pelo botão disponível na recepção e mantenha uma sessão autorizada.");
       else showLogin("");
       return false;
     }
@@ -219,6 +219,10 @@
     if (profileError || !profile || !profile.active) {
       await client.auth.signOut();
       showLogin("Conta sem perfil ativo. Solicite ao administrador a liberação do acesso.");
+      return false;
+    }
+    if (publicMode && !["master", "recepcao"].includes(profile.role)) {
+      showAccessMessage("Abra esta tela pelo botão disponível na recepção. Esta conta não tem permissão para exibir as chamadas.");
       return false;
     }
     if (overlay) {
@@ -234,12 +238,6 @@
 
   if (localMode) {
     cloud.resolveAuth({ role: "local", active: true });
-    root.classList.remove("favmed-auth-checking");
-    return;
-  }
-
-  if (publicMode) {
-    cloud.resolveAuth({ role: "sala", active: true, public: true });
     root.classList.remove("favmed-auth-checking");
     return;
   }
