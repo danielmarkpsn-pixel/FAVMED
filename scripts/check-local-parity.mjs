@@ -63,6 +63,10 @@ for (const required of [
   if (!cloud.includes(required)) throw new Error("A leitura pública isolada da fila está ausente: " + required);
 }
 const publicDisplayMigration = readFileSync("online/supabase/migrations/20261106163834_public_waiting_room_display.sql", "utf8");
+const publicDisplayGrantMigration = readFileSync("online/supabase/migrations/20261106164044_limit_waiting_room_rpc_to_anon.sql", "utf8");
+if (!publicDisplayGrantMigration.includes("from authenticated") || !publicDisplayGrantMigration.includes("to anon")) {
+  throw new Error("A RPC pública da sala deve ser acessível somente ao cliente anônimo dedicado.");
+}
 for (const required of [
   "if auth.uid() is not null then",
   "grant execute on function public.favmed_get_public_queue(text) to anon, authenticated",
