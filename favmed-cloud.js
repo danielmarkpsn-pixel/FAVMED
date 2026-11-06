@@ -8,6 +8,10 @@
   const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
     auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
   });
+  // Never reuse a staff login stored in the hallway browser.
+  const publicClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+  });
   let queueVersion = 0;
   let currentProfile = null;
   let resolveAuth;
@@ -108,9 +112,14 @@
     async readQueue(options) {
       await authReady;
       const publicMode = !!(options && options.publicMode);
-      const data = publicMode
-        ? await rpc("favmed_get_public_queue", { p_day: localDay() })
-        : await rpc("favmed_get_queue");
+      let data;
+      if (publicMode) {
+        const result = await publicClient.rpc("favmed_get_public_queue", { p_day: localDay() });
+        if (result.error) throw new Error(result.error.message || "Não foi possível carregar as chamadas públicas.");
+        data = result.data;
+      } else {
+        data = await rpc("favmed_get_queue");
+      }
       queueVersion = Number(data && data.version || 0);
       const queue = Array.isArray(data && data.queue) ? data.queue : [];
       return publicMode ? queue : await hydratePatientDocuments(queue);
