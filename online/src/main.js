@@ -197,9 +197,15 @@ function renderUserRows(users) {
   return users.map((user) => `
     <tr>
       <td><strong>${escapeHtml(user.display_name)}</strong><br><small>${escapeHtml(user.id)}</small></td>
-      <td>${escapeHtml(roleLabels[user.role] || user.role)}</td>
+      <td>${user.role === 'master' ? escapeHtml(roleLabels.master) : `
+        <select class="user-role-select" aria-label="Função de ${escapeHtml(user.display_name)}" data-user-id="${escapeHtml(user.id)}">
+          <option value="recepcao" ${user.role === 'recepcao' ? 'selected' : ''}>Recepção</option>
+          <option value="profissional" ${user.role === 'profissional' ? 'selected' : ''}>Profissional</option>
+          <option value="sala" ${user.role === 'sala' ? 'selected' : ''}>Sala de chamadas</option>
+        </select>`}</td>
       <td><span class="status-pill ${user.active ? 'active' : 'inactive'}">${user.active ? 'Ativa' : 'Bloqueada'}</span></td>
       <td>${user.role === 'master' ? '<span class="muted">Protegida</span>' : `
+        <button class="secondary user-role-save" type="button" data-user-id="${escapeHtml(user.id)}">Salvar função</button>
         <button class="secondary user-toggle" type="button" data-user-id="${escapeHtml(user.id)}" data-next-active="${!user.active}">
           ${user.active ? 'Bloquear' : 'Ativar'}
         </button>`}</td>
@@ -938,6 +944,7 @@ function renderHome(profile, userId) {
               <input id="new-email" name="email" type="email" required maxlength="254" autocomplete="email" />
               <label for="new-role">Perfil</label>
               <select id="new-role" name="role" required>
+                <option value="" disabled selected>Selecione a função do usuário</option>
                 <option value="recepcao">Recepção</option>
                 <option value="profissional">Profissional</option>
                 <option value="sala">Sala de chamadas</option>
@@ -1004,6 +1011,23 @@ function renderHome(profile, userId) {
 
   refreshButton.addEventListener('click', loadUsers);
   usersBody.addEventListener('click', async (event) => {
+    const roleButton = event.target.closest('.user-role-save');
+    if (roleButton) {
+      const select = usersBody.querySelector(`.user-role-select[data-user-id="${CSS.escape(roleButton.dataset.userId)}"]`);
+      if (!select) return;
+      roleButton.disabled = true;
+      adminMessage.textContent = '';
+      try {
+        await callMasterAction({ action: 'set_role', user_id: roleButton.dataset.userId, role: select.value });
+        adminMessage.textContent = 'Função do usuário atualizada. O novo acesso será aplicado no próximo login.';
+        await loadUsers();
+      } catch (error) {
+        adminMessage.textContent = error.message || 'Não foi possível alterar a função.';
+        adminMessage.className = 'message error';
+        roleButton.disabled = false;
+      }
+      return;
+    }
     const button = event.target.closest('.user-toggle');
     if (!button) return;
     button.disabled = true;
